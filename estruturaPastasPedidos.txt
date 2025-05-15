@@ -1,0 +1,30 @@
+echef-pedidos-web/
+├── public/
+├── src/
+│   ├── assets/
+│   ├── components/
+│   │   ├── common/         # Botões, Inputs, Modais genéricos
+│   │   ├── layout/         # Navbar, Sidebar (se houver)
+│   │   └── modules/        # Componentes específicos de módulos (auth, cardapio, comandas)
+│   ├── config/
+│   │   └── api.ts          # Configuração base do Axios
+│   ├── contexts/
+│   │   └── AuthContext.tsx # Contexto de autenticação
+│   ├── hooks/
+│   │   └── useAuth.ts      # Hook para acessar AuthContext
+│   ├── pages/              # Telas principais (LoginPage, DashboardPage, ComandasPage, CardapioPage, PedidoPage)
+│   ├── PWA/                # Arquivos do Service Worker, manifest
+│   ├── services/
+│   │   ├── authService.ts
+│   │   ├── cardapioService.ts
+│   │   ├── comandasService.ts
+│   │   └── pedidoService.ts
+│   ├── types/              # Definições de tipos TypeScript (User, Product, Comanda, Order etc.)
+│   ├── utils/              # Funções utilitárias
+│   ├── App.tsx             # Roteamento principal
+│   ├── main.tsx
+│   └── index.css
+├── .env                    # Variáveis de ambiente (VITE_API_BASE_URL)
+├── index.html
+├── package.json
+└── tsconfig.json

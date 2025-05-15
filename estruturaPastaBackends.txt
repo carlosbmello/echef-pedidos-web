@@ -1,0 +1,63 @@
+echef-backend/
+├── node_modules/         # Dependências do Node.js
+├── src/                  # Pasta principal do código fonte
+│   ├── config/           # Arquivos de configuração
+│   │   └── database.js   # Configuração da conexão com o BD (MySQL)
+│   │
+│   ├── controllers/      # Lógica de requisição/resposta HTTP
+│   │   ├── authController.js
+│   │   ├── categoryController.js
+│   │   ├── comandaController.js
+│   │   ├── movementController.js
+│   │   ├── paymentController.js
+│   │   ├── paymentMethodController.js
+│   │   ├── pedidoController.js
+│   │   ├── printPointController.js
+│   │   ├── printerController.js
+│   │   ├── productController.js
+│   │   ├── reportController.js
+│   │   └── subCategoryController.js
+│   │
+│   ├── middlewares/      # Funções intermediárias (autenticação, autorização)
+│   │   ├── authMiddleware.js
+│   │   └── authorizationMiddleware.js
+│   │
+│   ├── models/           # Interação com o banco de dados
+│   │   ├── categoryModel.js
+│   │   ├── comandaModel.js
+│   │   ├── itemPedidoModel.js
+│   │   ├── movementModel.js
+│   │   ├── paymentMethodModel.js
+│   │   ├── paymentModel.js
+│   │   ├── pedidoModel.js
+│   │   ├── printPointModel.js
+│   │   ├── printerModel.js
+│   │   ├── productModel.js
+│   │   ├── reportModel.js
+│   │   ├── sessionModel.js
+│   │   ├── subCategoryModel.js
+│   │   └── userModel.js
+│   │
+│   ├── routes/           # Definição dos endpoints da API
+│   │   ├── authRoutes.js
+│   │   ├── categoryRoutes.js
+│   │   ├── comandaRoutes.js
+│   │   ├── index.js       # Roteador principal que agrega os outros
+│   │   ├── movementRoutes.js
+│   │   ├── paymentMethodRoutes.js
+│   │   ├── paymentRoutes.js
+│   │   ├── pedidoRoutes.js
+│   │   ├── printPointRoutes.js
+│   │   ├── printerRoutes.js
+│   │   ├── productRoutes.js
+│   │   ├── reportRoutes.js
+│   │   └── subCategoryRoutes.js
+│   │
+│   └── services/         # Lógica de negócio ou serviços auxiliares (como impressão)
+│       └── printService.js # <<<--- O SERVIÇO DE IMPRESSÃO DO BACKEND (CommonJS)
+│
+├── .env                  # Variáveis de ambiente (BD, JWT Secret, etc.)
+├── .gitignore            # Arquivos/pastas ignorados pelo Git
+├── package-lock.json     # Lockfile das dependências
+├── package.json          # Manifesto do projeto Node.js
+└── server.js             # Ponto de entrada da aplicação Express
