@@ -1,66 +1,86 @@
 // src/types/pedido.ts
 
-// Interface para o item como está no ESTADO do PedidoPage
-export interface PedidoItemInput { // Usado em ItemPedidoState
+// 1. Item de um pedido que JÁ EXISTE e é retornado pela API 
+// (usado em ComandaDetalhada.itens em comanda.ts)
+export interface ItemPedido {
+  id: number; 
+  pedido_id?: number;
+  produto_id: number;
+  produto_nome: string;
+  quantidade: number;
+  preco_unitario_momento: number;
+  observacao_item: string | null;
+  status_item?: string;
+  data_hora_pedido?: string;
+  nome_garcom?: string;
+}
+
+// 2. Interface para o item como está no ESTADO local da PedidoPage (novos itens)
+export interface PedidoItemInput {
   produto_id: number;
   quantidade: number;
-  preco_unitario: number; // Preço no momento que foi adicionado ao carrinho (no estado)
-  observacao?: string;    // Observação do item (no estado)
+  preco_unitario: number; 
+  observacao?: string;
 }
 
-// ---- Interface para os ITENS que são enviados para o BACKEND (e salvos offline para sincronização) ----
-export interface ItemParaBackend { // Também pode ser chamado de ItemPedidoAPIPayload
+// 3. Interface para os ITENS que são enviados para o BACKEND ao criar/atualizar um pedido
+export interface ItemParaPayloadBackend { 
   produto_id: number;
   quantidade: number;
-  preco_unitario_momento: number; // Nome esperado pelo backend
-  observacao_item?: string;       // Nome esperado pelo backend
+  preco_unitario_momento: number;
+  observacao_item: string | null;
 }
 
-// ---- Interface para o PAYLOAD do PEDIDO enviado para o BACKEND ----
-export interface PedidoInput { // Payload para API (online)
-  comandaIdentifier: number; // ou string, dependendo da sua API
-  usuario_id: number;
-  local_pedido?: string;
-  observacao_geral?: string;
-  itens: ItemParaBackend[];
-}
-
-// ---- Tipos para Pedidos Offline ----
-export interface ItemPedidoOffline { // Estrutura do item dentro do PedidoOfflinePayload
-  produto_id: number;
-  nome_produto: string; // Para UI na lista de pendentes
-  quantidade: number;
-  preco_unitario_momento: number; // Consistente com ItemParaBackend
-  observacao_item?: string;       // Consistente com ItemParaBackend
-}
-
-export interface PedidoOfflinePayload { // O que é salvo no IndexedDB
-  localId: string; // Chave primária no IndexedDB (IMPORTANTE QUE SEJA 'localId')
-  comandaNumero: string;
-  usuario_id: number;
+// 4. Interface para o PAYLOAD do PEDIDO COMPLETO enviado para o BACKEND (POST /api/pedidos)
+// Este é o tipo que PedidoPage.tsx monta e pedidoService.ts->criarPedido deve esperar.
+export interface BackendPedidoPayload {
+  comandaIdentifier: string; 
   local_pedido: string;
-  observacao_geral?: string;
-  itens: ItemPedidoOffline[];
+  observacao_geral: string | null;
+  itens: ItemParaPayloadBackend[];
+  // usuario_id NÃO é enviado aqui, pois o backend pega do token.
+}
+
+// 5. Tipos para Pedidos Offline
+export interface ItemPedidoOffline {
+  produto_id: number;
+  nome_produto: string;
+  quantidade: number;
+  preco_unitario_momento: number; 
+  observacao_item: string | null;   // Consistente com ItemParaPayloadBackend
+}
+
+export interface PedidoOfflinePayload {
+  id_local: string;                 
   timestamp: number;
-  statusSync: 'pendente' | 'enviando' | 'sincronizado' | 'erro';
-  tentativasSync: number;
+  tentativas_sync: number;          
+  nome_cliente_comanda?: string | null;
+  numero_comanda_exibicao: string;  
+  comandaIdentifier: string; 
+  usuario_id_frontend: number;
+  local_pedido: string;
+  observacao_geral?: string; 
+  itens: ItemPedidoOffline[];
+  comanda_id_db?: number | null;
+  statusSync?: 'pendente' | 'enviando' | 'sincronizado' | 'erro';
   mensagemErroSync?: string;
 }
 
-// --- Tipos para dados retornados pela API (após criação/consulta) ---
-export interface PedidoItem { // Item de um pedido existente, retornado pela API
+// 6. Tipos para Pedido e PedidoItem retornados pela API (após consulta de um pedido específico)
+// Se sua API /pedidos/:id retorna algo assim, defina aqui.
+export interface PedidoDetalhadoItem { 
   id: number;
   pedido_id: number;
   produto_id: number;
   produto_nome: string;
   quantidade: number;
-  preco_unitario: number;
+  preco_unitario: number; // Note: nome diferente de preco_unitario_momento
   subtotal: number;
   observacao_item?: string;
-  status_item?: 'pendente' | 'impresso' | 'cancelado';
+  status_item?: string;
 }
 
-export interface Pedido { // Pedido existente, retornado pela API
+export interface PedidoDetalhado { // Renomeado de 'Pedido' para evitar conflito com 'ItemPedido'
   id: number;
   comanda_id: number;
   usuario_id: number;
@@ -68,5 +88,18 @@ export interface Pedido { // Pedido existente, retornado pela API
   local_pedido?: string;
   observacao_geral?: string;
   data_pedido: string;
-  itens: PedidoItem[];
+  status_pedido?: string;
+  itens: PedidoDetalhadoItem[];
+  valor_total_pedido?: number;
+}
+
+// O tipo PedidoInput que estava causando o erro.
+// Se a API de criar pedido NÃO espera usuario_id no corpo, este tipo é problemático para essa chamada.
+// BackendPedidoPayload é o tipo correto para o corpo da requisição POST /api/pedidos.
+export interface PedidoInput { 
+  comandaIdentifier: string | number; 
+  usuario_id: number; // O problema está aqui para a chamada de criarPedidoAPI
+  local_pedido?: string;
+  observacao_geral?:  string | null;
+  itens: ItemParaPayloadBackend[];
 }

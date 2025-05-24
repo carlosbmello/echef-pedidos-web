@@ -4,8 +4,8 @@ import {
   updatePedidoOfflineDB,
   deletePedidoOfflineDB,
 } from './dbService'; // PedidoOffline (tipo) removido daqui
+import { BackendPedidoPayload, PedidoOfflinePayload, ItemParaPayloadBackend } from '../types/pedido';
 import { criarPedido } from './pedidoService';
-import { PedidoInput, PedidoOfflinePayload, ItemParaBackend } from '../types/pedido'; // Importa PedidoOfflinePayload
 import { sincronizarComandasAbertasAPI } from './comandasService';
 
 let isSyncing = false;
@@ -28,38 +28,26 @@ const notifyUI = () => {
 };
 
 // Mapeia PedidoOfflinePayload para o formato que a API de criarPedido espera (PedidoInput)
-const mapPedidoOfflineToPedidoInput = (pedidoOffline: PedidoOfflinePayload): PedidoInput => {
-  // Remove campos específicos do offline que não vão para a API de criação
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const {
-    localId,
-    timestamp,
-    statusSync,
-    tentativasSync,
-    mensagemErroSync,
-    // Os campos restantes devem corresponder ao PedidoInput ou serem mapeados
-    // comandaNumero, usuario_id, local_pedido, observacao_geral, itens
-    ...rest
-  } = pedidoOffline;
-
-  // Assume que `rest` já tem `comandaNumero` como `comandaIdentifier` (ou precisa de ajuste)
-  // e que `rest.itens` está no formato `ItemPedidoOffline[]`
-  // Precisamos mapear `rest.itens` para `ItemParaBackend[]`
-  const itensParaApi: ItemParaBackend[] = rest.itens.map(itemOffline => ({
+const mapPedidoOfflineToPedidoInput = (pedidoOffline: PedidoOfflinePayload): BackendPedidoPayload => {
+  // O corpo da função começa AQUI com '{'
+  
+  // A lógica de mapear itens e o return devem estar DENTRO da função
+  const itensParaApi: ItemParaPayloadBackend[] = pedidoOffline.itens.map(itemOffline => ({
     produto_id: itemOffline.produto_id,
     quantidade: itemOffline.quantidade,
     preco_unitario_momento: itemOffline.preco_unitario_momento,
-    observacao_item: itemOffline.observacao_item,
+    // Certifique-se que ItemPedidoOffline tem observacao_item (ou o nome correto)
+    observacao_item: itemOffline.observacao_item, 
   }));
 
   return {
-    comandaIdentifier: parseInt(rest.comandaNumero), // API espera número? Se sim, converter.
-    usuario_id: rest.usuario_id,
-    local_pedido: rest.local_pedido,
-    observacao_geral: rest.observacao_geral,
+    comandaIdentifier: String(pedidoOffline.comandaIdentifier), // Garante que é string
+    local_pedido: pedidoOffline.local_pedido,
+    observacao_geral: pedidoOffline.observacao_geral === undefined ? null : pedidoOffline.observacao_geral,
     itens: itensParaApi,
+    // usuario_id não é incluído aqui, pois o backend o obtém do token JWT
   };
-};
+}; // A chave de fechamento da função está correta agora
 
 export const sincronizarPedidosPendentes = async (): Promise<{
   sucesso: number;
@@ -79,31 +67,31 @@ export const sincronizarPedidosPendentes = async (): Promise<{
     } else {
       console.log(`SINCRONIZAÇÃO (PEDIDOS): ${resultados.total} pedidos para sincronizar.`);
       for (const pedidoOffline of pedidosParaSincronizar) {
-        // Usa 'erro' em vez de 'falhou' e 'tentativasSync'
-        if (pedidoOffline.statusSync === 'pendente' || (pedidoOffline.statusSync === 'erro' && (pedidoOffline.tentativasSync || 0) < 5)) {
+        // Usa 'erro' em vez de 'falhou' e 'tentativas_sync'
+        if (pedidoOffline.statusSync === 'pendente' || (pedidoOffline.statusSync === 'erro' && (pedidoOffline.tentativas_sync || 0) < 5)) {
           let pedidoAtualizado: PedidoOfflinePayload = {
             ...pedidoOffline,
             statusSync: 'enviando', // 'enviando' deve estar no tipo PedidoOfflinePayload.statusSync
-            tentativasSync: (pedidoOffline.tentativasSync || 0) + 1
+            tentativas_sync: (pedidoOffline.tentativas_sync || 0) + 1
           };
           await updatePedidoOfflineDB(pedidoAtualizado);
-          console.log(`SINCRONIZAÇÃO (PEDIDOS): Enviando ID: ${pedidoOffline.localId}, Tentativa: ${pedidoAtualizado.tentativasSync}`); // Usa localId
+          console.log(`SINCRONIZAÇÃO (PEDIDOS): Enviando ID: ${pedidoOffline.id_local}, Tentativa: ${pedidoAtualizado.tentativas_sync}`); // Usa id_local
           try {
-            const pedidoPayloadParaAPI = mapPedidoOfflineToPedidoInput(pedidoOffline);
-            await criarPedido(pedidoPayloadParaAPI); // Envia para a API
-            await deletePedidoOfflineDB(pedidoOffline.localId); // Usa localId
-            console.log(`SINCRONIZAÇÃO (PEDIDOS): ID: ${pedidoOffline.localId} sincronizado.`); // Usa localId
+            const BackendPedidoPayload = mapPedidoOfflineToPedidoInput(pedidoOffline);
+            await criarPedido(BackendPedidoPayload); // Envia para a API
+            await deletePedidoOfflineDB(pedidoOffline.id_local); // Usa id_local
+            console.log(`SINCRONIZAÇÃO (PEDIDOS): ID: ${pedidoOffline.id_local} sincronizado.`); // Usa id_local
             resultados.sucesso++;
           } catch (error: any) {
             const msgErro = error.response?.data?.message || error.message || 'Erro desconhecido ao sincronizar pedido.';
-            console.error(`SINCRONIZAÇÃO (PEDIDOS): Falha ID: ${pedidoOffline.localId}. Erro: ${msgErro}`); // Usa localId
+            console.error(`SINCRONIZAÇÃO (PEDIDOS): Falha ID: ${pedidoOffline.id_local}. Erro: ${msgErro}`); // Usa id_local
             // Usa 'erro' e 'mensagemErroSync'
             await updatePedidoOfflineDB({ ...pedidoAtualizado, statusSync: 'erro', mensagemErroSync: msgErro.substring(0, 255) });
             resultados.falha++;
-            resultados.erros.push({ idLocal: pedidoOffline.localId, mensagem: msgErro }); // Usa localId
+            resultados.erros.push({ idLocal: pedidoOffline.id_local, mensagem: msgErro }); // Usa id_local
           }
         } else if (pedidoOffline.statusSync === 'erro') { // Usa 'erro'
-          console.warn(`SINCRONIZAÇÃO (PEDIDOS): ID: ${pedidoOffline.localId} no limite de tentativas ou já marcado com erro.`); // Usa localId
+          console.warn(`SINCRONIZAÇÃO (PEDIDOS): ID: ${pedidoOffline.id_local} no limite de tentativas ou já marcado com erro.`); // Usa id_local
         }
       }
     }

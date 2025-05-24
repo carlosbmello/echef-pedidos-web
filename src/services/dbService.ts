@@ -97,13 +97,13 @@ export const salvarPedidoParaSincronizacaoDB = async (pedido: PedidoOfflinePaylo
     console.log("DB_SAVE: Tentando obter instância do DB...");
     const db = await initDB();
     console.log("DB_SAVE: Instância do DB obtida. Tentando 'put' para o pedido:", JSON.parse(JSON.stringify(pedido))); // Log para ver o objeto completo
-    if (!pedido.localId) {
+    if (!pedido.id_local) {
         console.error("DB_SAVE: ERRO - Pedido Offline sem localId! Não será salvo.", pedido);
         throw new Error("Pedido Offline não pode ser salvo sem um localId.");
     }
     const resultKey = await db.put('pedidosOffline', pedido);
-    console.log(`DB_SAVE: Pedido Offline ${pedido.localId} (key: ${resultKey}) salvo/atualizado com sucesso.`);
-    return pedido.localId;
+    console.log(`DB_SAVE: Pedido Offline ${pedido.id_local} (key: ${resultKey}) salvo/atualizado com sucesso.`);
+    return pedido.id_local;
   } catch (error) {
     console.error("DB_SAVE: Erro DENTRO de salvarPedidoParaSincronizacaoDB:", error, "Objeto do pedido:", JSON.parse(JSON.stringify(pedido)));
     throw error; // Re-lança o erro para ser pego pela chamada em PedidoPage
@@ -113,7 +113,7 @@ export const salvarPedidoParaSincronizacaoDB = async (pedido: PedidoOfflinePaylo
 export const getPedidosOfflineDB = async (): Promise<PedidoOfflinePayload[]> => { const db = await initDB(); return db.getAllFromIndex('pedidosOffline', 'timestamp'); };
 export const getPedidoOfflineByIdDB = async (localId: string): Promise<PedidoOfflinePayload | undefined> => { const db = await initDB(); return db.get('pedidosOffline', localId);};
 export const deletePedidoOfflineDB = async (localId: string): Promise<void> => { const db = await initDB(); await db.delete('pedidosOffline', localId); console.log(`DB: Pedido Offline ${localId} deletado.`); };
-export const updatePedidoOfflineDB = async (pedido: PedidoOfflinePayload): Promise<string> => { const db = await initDB(); await db.put('pedidosOffline', pedido); console.log(`DB: Pedido Offline ${pedido.localId} atualizado.`); return pedido.localId; };
+export const updatePedidoOfflineDB = async (pedido: PedidoOfflinePayload): Promise<string> => { const db = await initDB(); await db.put('pedidosOffline', pedido); console.log(`DB: Pedido Offline ${pedido.id_local} atualizado.`); return pedido.id_local; };
 
 export const getComandaCacheByNumeroDB = async (numeroComanda: string): Promise<ComandaCache | undefined> => { const db = await initDB(); return db.get('comandas_abertas_cache', numeroComanda);};
 export const getAllComandasCacheDB = async (): Promise<ComandaCache[]> => { const db = await initDB(); return db.getAll('comandas_abertas_cache');};

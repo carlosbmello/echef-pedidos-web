@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { trySincronizarEInformar, onSyncStatusChange, getSyncStatus, sincronizarPedidosPendentes } from '../services/syncService'; // Adicionado sincronizarPedidosPendentes se for usar para individual
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { FiRefreshCw, FiAlertTriangle, FiTrash2, FiClock, FiEye, FiXCircle, FiCheckCircle, FiSend } from 'react-icons/fi'; // Adicionado FiEye, FiXCircle, FiCheckCircle, FiSend
+import { FiRefreshCw, FiAlertTriangle, FiTrash2, FiClock, FiEye, FiCheckCircle, FiSend } from 'react-icons/fi'; // Adicionado FiEye, FiXCircle, FiCheckCircle, FiSend
 import { PedidoOfflinePayload, ItemPedidoOffline } from '../types/pedido';
 import { getPedidosOfflineDB, deletePedidoOfflineDB, updatePedidoOfflineDB } from '../services/dbService'; // updatePedidoOfflineDB pode ser útil para sync individual
 import { toast } from 'react-toastify';
@@ -20,7 +20,7 @@ const PedidosPendentesPage: React.FC = () => {
   const [pageError, setPageError] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatusInfo>(getSyncStatus());
   const [pedidoSelecionadoParaVerItens, setPedidoSelecionadoParaVerItens] = useState<PedidoOfflinePayload | null>(null);
-  const [isSyncingIndividual, setIsSyncingIndividual] = useState<string | null>(null); // Armazena o localId do pedido sendo sincronizado individualmente
+  const [isSyncingIndividual, setIsSyncingIndividual] = useState<string | null>(null); // Armazena o id_local do pedido sendo sincronizado individualmente
 
   const carregarPedidos = useCallback(async () => {
     setIsLoading(true);
@@ -75,10 +75,10 @@ const PedidosPendentesPage: React.FC = () => {
     await trySincronizarEInformar();
   };
 
-  const handleDescartarPedido = async (localId: string) => {
-    if (window.confirm(`Tem certeza que deseja descartar o pedido local ${localId.substring(0,8)}...? Esta ação não pode ser desfeita.`)) {
+  const handleDescartarPedido = async (id_local: string) => {
+    if (window.confirm(`Tem certeza que deseja descartar o pedido local ${id_local.substring(0,8)}...? Esta ação não pode ser desfeita.`)) {
       try {
-        await deletePedidoOfflineDB(localId);
+        await deletePedidoOfflineDB(id_local);
         toast.success('Pedido local descartado com sucesso.');
         carregarPedidos();
       } catch (err: any) {
@@ -98,18 +98,18 @@ const PedidosPendentesPage: React.FC = () => {
         return;
     }
     
-    setIsSyncingIndividual(pedido.localId);
-    toast.info(`Tentando sincronizar pedido ${pedido.localId.substring(0,8)}...`);
+    setIsSyncingIndividual(pedido.id_local);
+    toast.info(`Tentando sincronizar pedido ${pedido.id_local.substring(0,8)}...`);
 
     try {
         // Lógica similar à de sincronizarPedidosPendentes, mas para um único pedido
         const pedidoAtualizado: PedidoOfflinePayload = {
             ...pedido,
             statusSync: 'enviando',
-            tentativasSync: (pedido.tentativasSync || 0) + 1,
+            tentativas_sync: (pedido.tentativas_sync || 0) + 1,
         };
         await updatePedidoOfflineDB(pedidoAtualizado);
-        setPedidosPendentes(prev => prev.map(p => p.localId === pedido.localId ? pedidoAtualizado : p)); // Atualiza UI imediatamente
+        setPedidosPendentes(prev => prev.map(p => p.id_local === pedido.id_local ? pedidoAtualizado : p)); // Atualiza UI imediatamente
 
         // Reutiliza mapPedidoOfflineToPedidoInput e criarPedido (precisam ser importados/disponíveis)
         // Esta parte precisaria da função mapPedidoOfflineToPedidoInput e criarPedido do pedidoService
@@ -120,20 +120,20 @@ const PedidosPendentesPage: React.FC = () => {
         // *** ASSUMINDO QUE syncService.sincronizarPedidosPendentes() pode ser chamado para reavaliar ***
         const resultados = await sincronizarPedidosPendentes(); // Chama a função que itera sobre todos
 
-        const erroDoPedido = resultados.erros.find(e => e.idLocal === pedido.localId);
+        const erroDoPedido = resultados.erros.find(e => e.idLocal === pedido.id_local);
         if (resultados.sucesso > 0 && !erroDoPedido) { // Verifica se este pedido específico teve sucesso
-             toast.success(`Pedido ${pedido.localId.substring(0,8)} sincronizado com sucesso!`);
+             toast.success(`Pedido ${pedido.id_local.substring(0,8)} sincronizado com sucesso!`);
         } else if (erroDoPedido) {
-             toast.error(`Falha ao sincronizar pedido ${pedido.localId.substring(0,8)}: ${erroDoPedido.mensagem}`);
+             toast.error(`Falha ao sincronizar pedido ${pedido.id_local.substring(0,8)}: ${erroDoPedido.mensagem}`);
         } else if (resultados.total > 0 && resultados.sucesso === 0 && resultados.falha === 0) {
              // Pode acontecer se o pedido não estava mais no estado 'pendente' ou 'erro' com < 5 tentativas
-             toast.info(`Pedido ${pedido.localId.substring(0,8)} não necessitou de sincronização ou já foi processado.`);
+             toast.info(`Pedido ${pedido.id_local.substring(0,8)} não necessitou de sincronização ou já foi processado.`);
         }
         // A lista será recarregada pelo onSyncStatusChange após a sincronização global terminar
     } catch (error: any) {
-        toast.error(`Erro ao tentar sincronizar pedido ${pedido.localId.substring(0,8)}: ${error.message || 'Erro desconhecido'}`);
+        toast.error(`Erro ao tentar sincronizar pedido ${pedido.id_local.substring(0,8)}: ${error.message || 'Erro desconhecido'}`);
         // Reverte o status na UI se a chamada inicial falhar (antes da API)
-        const pedidoOriginal = await getPedidosOfflineDB().then(pedidos => pedidos.find(p => p.localId === pedido.localId));
+        const pedidoOriginal = await getPedidosOfflineDB().then(pedidos => pedidos.find(p => p.id_local === pedido.id_local));
         if(pedidoOriginal) await updatePedidoOfflineDB(pedidoOriginal);
     } finally {
         setIsSyncingIndividual(null);
@@ -176,24 +176,24 @@ const PedidosPendentesPage: React.FC = () => {
 
       <div className="space-y-4">
         {pedidosPendentes.map((pedido) => (
-          <div key={pedido.localId} className={`p-4 rounded-lg shadow-lg border-l-4 relative ${
+          <div key={pedido.id_local} className={`p-4 rounded-lg shadow-lg border-l-4 relative ${
             pedido.statusSync === 'pendente' ? 'border-yellow-400 bg-yellow-50 hover:shadow-yellow-200/50' :
-            pedido.statusSync === 'enviando' || isSyncingIndividual === pedido.localId ? 'border-blue-400 bg-blue-50 animate-pulse hover:shadow-blue-200/50' :
+            pedido.statusSync === 'enviando' || isSyncingIndividual === pedido.id_local ? 'border-blue-400 bg-blue-50 animate-pulse hover:shadow-blue-200/50' :
             pedido.statusSync === 'erro' ? 'border-red-400 bg-red-50 hover:shadow-red-200/50' :
             pedido.statusSync === 'sincronizado' ? 'border-green-400 bg-green-50 hover:shadow-green-200/50' :
             'border-gray-300 bg-gray-50'
           }`}>
             <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
               <div className="flex-grow">
-                <p className="text-xs text-gray-500 mb-1">ID: <span className="font-mono">{pedido.localId.substring(0,8)}</span></p>
-                <p className="font-semibold text-gray-800 text-lg">Comanda {pedido.comandaNumero}</p>
+                <p className="text-xs text-gray-500 mb-1">ID: <span className="font-mono">{pedido.id_local.substring(0,8)}</span></p>
+                <p className="font-semibold text-gray-800 text-lg">Comanda {pedido.numero_comanda_exibicao}</p>
                 <p className="text-sm text-gray-600">Local: {pedido.local_pedido || 'N/A'}</p>
                 <p className="text-xs text-gray-500 mt-1">Criado em: {new Date(pedido.timestamp).toLocaleString('pt-BR')}</p>
                 <p className="text-sm mt-2">
                   Status:
                   {pedido.statusSync === 'pendente' && <span className="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"><FiClock className="mr-1.5 h-4 w-4"/> Pendente</span>}
-                  {(pedido.statusSync === 'enviando' || isSyncingIndividual === pedido.localId) && <span className="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"><FiRefreshCw className="mr-1.5 h-4 w-4 animate-spin"/> Enviando...</span>}
-                  {pedido.statusSync === 'erro' && <span className="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><FiAlertTriangle className="mr-1.5 h-4 w-4"/> Falhou (Tentativas: {pedido.tentativasSync || 0})</span>}
+                  {(pedido.statusSync === 'enviando' || isSyncingIndividual === pedido.id_local) && <span className="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"><FiRefreshCw className="mr-1.5 h-4 w-4 animate-spin"/> Enviando...</span>}
+                  {pedido.statusSync === 'erro' && <span className="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><FiAlertTriangle className="mr-1.5 h-4 w-4"/> Falhou (Tentativas: {pedido.tentativas_sync || 0})</span>}
                   {pedido.statusSync === 'sincronizado' && <span className="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"><FiCheckCircle className="mr-1.5 h-4 w-4"/> Sincronizado</span>}
                 </p>
                 {pedido.statusSync === 'erro' && pedido.mensagemErroSync && (
@@ -217,7 +217,7 @@ const PedidosPendentesPage: React.FC = () => {
                     </button>
                 )}
                 <button
-                  onClick={() => handleDescartarPedido(pedido.localId)}
+                  onClick={() => handleDescartarPedido(pedido.id_local)}
                   className="text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md flex items-center w-full sm:w-auto justify-center"
                 >
                   <FiTrash2 className="mr-2"/> Descartar
@@ -231,7 +231,7 @@ const PedidosPendentesPage: React.FC = () => {
       {/* Modal para Ver Itens */}
       {pedidoSelecionadoParaVerItens && (
         <Modal
-          titulo={`Itens do Pedido (Comanda ${pedidoSelecionadoParaVerItens.comandaNumero} - ID: ${pedidoSelecionadoParaVerItens.localId.substring(0,8)})`}
+          titulo={`Itens do Pedido (Comanda ${pedidoSelecionadoParaVerItens.numero_comanda_exibicao} - ID: ${pedidoSelecionadoParaVerItens.id_local.substring(0,8)})`}
           onClose={() => setPedidoSelecionadoParaVerItens(null)}
         >
           <div className="mt-2 text-sm text-gray-700 space-y-2">

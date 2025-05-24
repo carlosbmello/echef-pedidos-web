@@ -1,63 +1,64 @@
-// src/services/comandaService.ts
+// src/services/comandasService.ts
 import apiClient from '../config/api';
-import { Comanda, ComandaSearchResult } from '../types/comanda';
-import { Comanda as ComandaCompletaAPI } from '../types/comanda';
-import { ComandaCache, bulkReplaceComandasCacheDB, setConfig } from './dbService';
-import { ComandaBasica, ComandaDetalhada } from '../types/comanda'; 
+import { 
+    Comanda,                // Para o tipo de retorno da API de lista (ex: GET /comandas)
+    ComandaCache, 
+    ComandaDetalhada, 
+    ComandaSearchResult     // Que agora é Comanda | null
+} from '../types/comanda';
+import { bulkReplaceComandasCacheDB, setConfig } from './dbService';
 
+const API_URL_BASE = `${import.meta.env.VITE_API_BASE_URL}`; // URL base da API
+const API_COMANDAS_ENDPOINT = `${API_URL_BASE}/comandas`; // Endpoint específico de comandas
 
+// Tipos para Payload e Resposta da Criação de Nova Comanda
+interface NovaComandaPayload {
+  numero: string;
+  cliente_nome?: string | null;
+  // local_atual foi removido, pois você indicou que não é informado na criação
+}
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL}/comandas`;
+interface NovaComandaResponse {
+  message: string;
+  comandaId: number;
+  // comanda?: Comanda; // Opcional: se a API retornar o objeto criado
+}
 
-// Busca uma comanda específica pelo número (apenas se estiver aberta)
-export const fetchComandaByNumero = async (numeroComanda: string): Promise<ComandaSearchResult> => {
+// --- FUNÇÃO PARA CRIAR NOVA COMANDA ---
+export const criarNovaComandaAPI = async (payload: NovaComandaPayload): Promise<NovaComandaResponse> => {
+  console.log("[comandasService] Enviando para criar nova comanda:", payload);
   try {
-    // Ajuste o endpoint e parâmetros conforme a definição da sua API
-    // Exemplo: /comandas?numero=123&status=aberta
-    // A API deve retornar um array (mesmo que vazio ou com 1 elemento) ou um objeto direto?
-    // Assumindo que retorna um array e pegamos o primeiro (ou null)
-    const response = await apiClient.get<Comanda[]>(`/comandas`, {
-      params: {
-        numero: numeroComanda,
-        status: 'aberta' // Garante que só buscamos comandas abertas
-      }
-    });
-
-    if (response.data && response.data.length > 0) {
-      return response.data[0]; // Retorna a primeira comanda encontrada
-    }
-    return null; // Nenhuma comanda aberta encontrada com esse número
+    const response = await apiClient.post<NovaComandaResponse>(`${API_COMANDAS_ENDPOINT}/`, payload); // POST para /api/comandas/
+    return response.data;
   } catch (error: any) {
-    // Tratar erros específicos se necessário (ex: 404 não é um erro de rede)
-    if (error.response && error.response.status === 404) {
-        return null; // Comanda não encontrada
-    }
-    console.error('Erro ao buscar comanda por número:', error);
-    throw error; // Re-throw para o componente tratar (ex: mostrar mensagem de erro de rede)
+    console.error("Erro no serviço ao criar nova comanda:", error);
+    throw error; 
   }
 };
 
-
-// Função para buscar UMA comanda por NÚMERO com todos os detalhes e itens
+// --- Função para buscar UMA comanda específica por NÚMERO (usada na ComandasPage ao buscar) ---
+// Esta função deve retornar ComandaDetalhada se você quiser exibir os itens já na ComandasPage.
 export const buscarComandaDetalhadaPorNumeroAPI = async (numeroComanda: string): Promise<ComandaDetalhada | null> => {
-    console.log(`[comandaService] Buscando detalhes completos para comanda Nº ${numeroComanda}...`);
+    console.log(`[comandasService] Buscando detalhes completos para comanda Nº ${numeroComanda}...`);
     try {
-        const response = await apiClient.get<ComandaDetalhada>(`${API_URL}/numero/${numeroComanda}`);
+        // Chama a rota específica do backend para busca por número
+        const response = await apiClient.get<ComandaDetalhada>(`${API_COMANDAS_ENDPOINT}/numero/${numeroComanda}`);
         return response.data;
     } catch (error: any) {
         if (error.response && error.response.status === 404) {
-            return null; // Comanda não encontrada
+            return null; 
         }
         console.error(`Erro ao buscar comanda detalhada Nº ${numeroComanda}:`, error);
-        throw error; // Relança para a UI tratar
+        throw error; 
     }
 };
 
-// Função para buscar UMA comanda por ID com todos os detalhes e itens
+// --- Função para buscar UMA comanda por ID com todos os detalhes e itens (usada na PedidoPage) ---
 export const buscarComandaDetalhadaPorIdAPI = async (comandaId: number): Promise<ComandaDetalhada | null> => {
-    console.log(`[comandaService] Buscando detalhes completos para comanda ID ${comandaId}...`);
+    console.log(`[comandasService] Buscando detalhes completos para comanda ID ${comandaId}...`);
     try {
-        const response = await apiClient.get<ComandaDetalhada>(`${API_URL}/id/${comandaId}`);
+        // Chama a rota específica do backend para busca por ID
+        const response = await apiClient.get<ComandaDetalhada>(`${API_COMANDAS_ENDPOINT}/id/${comandaId}`);
         return response.data;
     } catch (error: any) {
         if (error.response && error.response.status === 404) {
@@ -69,19 +70,16 @@ export const buscarComandaDetalhadaPorIdAPI = async (comandaId: number): Promise
 };
 
 
-// --- NOVA FUNÇÃO PARA SINCRONIZAR COMANDAS ABERTAS ---
- export const sincronizarComandasAbertasAPI = async (): Promise<number> => {
+// --- Função para SINCRONIZAR Comandas Abertas ---
+ // Usada para popular o cache local com dados básicos das comandas abertas.
+export const sincronizarComandasAbertasAPI = async (): Promise<number> => {
   console.log("COMANDAS_SVC: Sincronizando comandas abertas da API...");
   try {
-    // Busca da API apenas os campos necessários para o cache
-    // A API do backend /comandas precisa suportar um query param como 'fields' ou retornar
-    // uma versão simplificada se outro endpoint for usado.
-    // Assumindo que /comandas?status=aberta retorna objetos completos.
-    const response = await apiClient.get<ComandaCompletaAPI[]>('/comandas', {
+    // A API GET /api/comandas?status=aberta retorna um array de objetos Comanda.
+    // O tipo Comanda (definido em comanda.ts) deve refletir a estrutura desses objetos.
+    const response = await apiClient.get<Comanda[]>(`${API_COMANDAS_ENDPOINT}`, { // GET para /api/comandas
       params: {
        status: 'aberta',
-        // Opcional: Se sua API suportar seleção de campos para otimizar:
-        // fields: 'id,numero,cliente_nome' // Exemplo
       }
     });
 
@@ -91,17 +89,22 @@ export const buscarComandaDetalhadaPorIdAPI = async (comandaId: number): Promise
       const comandasParaCache: ComandaCache[] = comandasDaAPI.map(c => ({
         id: c.id,
         numero: c.numero,
-        cliente_nome: c.cliente_nome, // Mapeia se existir em ComandaCompletaAPI
-        local_atual: c.localizacao_cliente, // Mapeia se existir (ou o nome do campo na API)
-        data_abertura: c.data_abertura, // Mapeia se existir
-        // A API retorna valor_total_calculado como string, precisamos converter para número
-        valor_total_calculado: typeof c.valor_total_calculado === 'string'
-            ? parseFloat(c.valor_total_calculado)
-            : (typeof c.valor_total_calculado === 'number' ? c.valor_total_calculado : null),
+        cliente_nome: c.cliente_nome,
+        // O tipo Comanda pode ter local_atual ou localizacao_cliente.
+        // O tipo ComandaCache espera local_atual.
+        local_atual: c.local_atual || c.localizacao_cliente, 
+        data_abertura: c.data_abertura,
+        status: c.status, // Mapeia o status para o cache
+        // O tipo Comanda pode ter valor_total_calculado (string/number) ou total_atual_calculado (number).
+        // O tipo ComandaCache espera valor_total_calculado (number | null).
+        valor_total_calculado: 
+            c.total_atual_calculado !== undefined ? c.total_atual_calculado : // Prioriza se existir
+            (typeof c.valor_total_calculado === 'string' ? parseFloat(c.valor_total_calculado) :
+            (typeof c.valor_total_calculado === 'number' ? c.valor_total_calculado : null)),
       }));
 
       await bulkReplaceComandasCacheDB(comandasParaCache);
-      await setConfig('lastComandasAbertasSync', Date.now()); // Atualiza timestamp da sincronização
+      await setConfig('lastComandasAbertasSync', Date.now());
       console.log(`COMANDAS_SVC: ${comandasParaCache.length} comandas abertas sincronizadas para o cache local.`);
       return comandasParaCache.length;
     } else {
@@ -110,7 +113,30 @@ export const buscarComandaDetalhadaPorIdAPI = async (comandaId: number): Promise
     }
   } catch (error) {
     console.error("COMANDAS_SVC: Erro ao sincronizar comandas abertas:", error);
-    // Não lançar erro aqui para não quebrar o fluxo de sync geral se esta parte falhar
-    return 0; // Indica que 0 comandas foram sincronizadas devido ao erro
+    return 0;
+  }
+};
+
+
+// Se você ainda usa fetchComandaByNumero em algum lugar para uma busca mais simples
+// e ela retorna um tipo diferente de ComandaDetalhada, mantenha-a, mas
+// certifique-se que o tipo ComandaSearchResult e Comanda estão corretos.
+// Se ela não for mais usada, pode ser removida.
+// Por segurança, vou mantê-la aqui, mas a busca principal na ComandasPage agora usa buscarComandaDetalhadaPorNumeroAPI.
+export const fetchComandaByNumero = async (numeroComanda: string): Promise<ComandaSearchResult> => {
+  try {
+    const response = await apiClient.get<Comanda[]>(`${API_COMANDAS_ENDPOINT}`, {
+      params: { numero: numeroComanda, status: 'aberta' }
+    });
+    if (response.data && response.data.length > 0) {
+      return response.data[0]; 
+    }
+    return null; 
+  } catch (error: any) {
+    if (error.response && error.response.status === 404) {
+        return null; 
+    }
+    console.error(`Erro ao buscar comanda (simples) por número ${numeroComanda}:`, error);
+    throw error; 
   }
 };
