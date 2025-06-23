@@ -4,7 +4,7 @@ import { Produto, Categoria, Subcategoria } from '../types/cardapio';
 import { PedidoOfflinePayload } from '../types/pedido'; // Importação centralizada
 
 const DB_NAME = 'eChefPedidosDB';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 export interface ComandaCache {
   id: number;
@@ -42,7 +42,7 @@ const initDB = () => {
         if (oldVersion < 2) {
           console.log("DB: Aplicando schema v2 (pedidosOffline)");
           if (!db.objectStoreNames.contains('pedidosOffline')) {
-            const pedidosStore = db.createObjectStore('pedidosOffline', { keyPath: 'localId' }); // CRUCIAL: keyPath é 'localId'
+            const pedidosStore = db.createObjectStore('pedidosOffline', { keyPath: 'id_local' }); // CRUCIAL: keyPath é 'localId'
             pedidosStore.createIndex('timestamp', 'timestamp');
             pedidosStore.createIndex('statusSync', 'statusSync');
             console.log("DB: Store 'pedidosOffline' criada com keyPath 'localId'.");

@@ -2,29 +2,26 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-// ComandaDetalhada não é usada diretamente se comandaOriginalInfo tem seu próprio tipo.
-// import { ComandaDetalhada } from '../types/comanda'; 
-import { PedidoItemInput, BackendPedidoPayload, PedidoOfflinePayload } from '../types/pedido'; // Removido ItemPedidoOffline se não usado diretamente
+import { PedidoItemInput, BackendPedidoPayload, PedidoOfflinePayload } from '../types/pedido';
 import { criarPedido as criarPedidoAPI } from '../services/pedidoService';
 import { salvarPedidoParaSincronizacaoDB } from '../services/dbService';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'react-toastify';
-// FiMapPin, FiMessageSquare removidos. FiShoppingBag também se não usado.
-import { FiArrowLeft, FiSave, FiTrash2, FiEdit2, FiPlus, FiMinus, FiShoppingBag } from 'react-icons/fi'; 
+import { FiArrowLeft, FiSave, FiTrash2, FiEdit2, FiPlus, FiMinus, FiShoppingBag } from 'react-icons/fi';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 interface ItemRevisaoState extends PedidoItemInput {
   nome_produto: string;
 }
 
-interface ComandaOriginalInfoParaRevisao { // Tipo para os dados básicos da comanda
-    id: number | null;
-    numero: string | null;
-    cliente_nome: string | null;
-    status: string | null;
-    total_ja_consumido: number;
-    local_atual: string | null; 
-    observacao_geral: string | null; 
+interface ComandaOriginalInfoParaRevisao {
+  id: number | null;
+  numero: string | null;
+  cliente_nome: string | null;
+  status: string | null;
+  total_ja_consumido: number;
+  local_atual: string | null;
+  observacao_geral: string | null;
 }
 
 const RevisarPedidoPage: React.FC = () => {
@@ -37,36 +34,57 @@ const RevisarPedidoPage: React.FC = () => {
   const [itensParaRevisao, setItensParaRevisao] = useState<ItemRevisaoState[]>([]);
   const [observacaoGeralPedido, setObservacaoGeralPedido] = useState<string>('');
   const [localParaImpressao, setLocalParaImpressao] = useState<string | null>(null);
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusConexao, setStatusConexao] = useState<'online' | 'offline'>(navigator.onLine ? 'online' : 'offline');
   const [isLoadingPage, setIsLoadingPage] = useState(true);
 
   useEffect(() => {
+    console.log("[RevisarPedidoPage] useEffect - Início. location.state:", JSON.stringify(location.state, null, 2));
+
     if (location.state) {
-      const { 
-        comandaOriginal, novosItens, 
-        observacaoGeralPedidoAtual, localInformadoParaImpressao 
-      } = location.state as { 
-        comandaOriginal: ComandaOriginalInfoParaRevisao, novosItens: ItemRevisaoState[], 
-        observacaoGeralPedidoAtual: string | null, localInformadoParaImpressao: string | null 
+      const {
+        comandaOriginal, novosItens,
+        observacaoGeralPedidoAtual, localInformadoParaImpressao
+      } = location.state as {
+        comandaOriginal: ComandaOriginalInfoParaRevisao, novosItens: ItemRevisaoState[],
+        observacaoGeralPedidoAtual: string | null, localInformadoParaImpressao: string | null
       };
+
+      console.log("[RevisarPedidoPage] useEffect - Dados extraídos do location.state:", {
+        comandaOriginal: JSON.stringify(comandaOriginal, null, 2),
+        novosItens: JSON.stringify(novosItens, null, 2),
+        observacaoGeralPedidoAtual,
+        localInformadoParaImpressao // Este é crucial!
+      });
+
       if (comandaOriginal && novosItens !== undefined && observacaoGeralPedidoAtual !== undefined && localInformadoParaImpressao !== undefined) {
         setComandaOriginalInfo(comandaOriginal);
         setItensParaRevisao(novosItens || []);
         setObservacaoGeralPedido(observacaoGeralPedidoAtual || '');
-        setLocalParaImpressao(localInformadoParaImpressao);
+        setLocalParaImpressao(localInformadoParaImpressao); // Se localInformadoParaImpressao for null aqui, localParaImpressao (estado) será null
+        console.log("[RevisarPedidoPage] useEffect - Estados atualizados. localParaImpressao foi setado para:", localInformadoParaImpressao);
       } else {
-        toast.error("Dados incompletos para revisão."); navigate(comandaIdFromUrl ? `/comandas/${comandaIdFromUrl}/novo-pedido` : '/comandas', { replace: true });
+        toast.error("Dados incompletos para revisão. Retornando para edição.");
+        console.error("[RevisarPedidoPage] useEffect - Dados incompletos no location.state para iniciar a revisão.", { comandaOriginal, novosItens, observacaoGeralPedidoAtual, localInformadoParaImpressao });
+        navigate(comandaIdFromUrl ? `/comandas/${comandaIdFromUrl}/novo-pedido` : '/comandas', { replace: true });
       }
     } else {
-      toast.error("Dados para revisão não encontrados."); navigate(comandaIdFromUrl ? `/comandas/${comandaIdFromUrl}/novo-pedido` : '/comandas', { replace: true });
+      toast.error("Dados para revisão não encontrados. Retornando para edição.");
+      console.error("[RevisarPedidoPage] useEffect - location.state não encontrado.");
+      navigate(comandaIdFromUrl ? `/comandas/${comandaIdFromUrl}/novo-pedido` : '/comandas', { replace: true });
     }
     setIsLoadingPage(false);
-    const handleOnline = () => setStatusConexao('online'); const handleOffline = () => setStatusConexao('offline');
-    window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline);
-    return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
-  }, [location.state, comandaIdFromUrl, navigate]);
+
+    const handleOnline = () => { console.log("[RevisarPedidoPage] Evento ONLINE detectado."); setStatusConexao('online'); };
+    const handleOffline = () => { console.log("[RevisarPedidoPage] Evento OFFLINE detectado."); setStatusConexao('offline'); };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [location, comandaIdFromUrl, navigate]); // 'location' inclui 'location.state'
 
   const subtotalNovosItens = useMemo(() => itensParaRevisao.reduce((acc, item) => acc + (item.quantidade * item.preco_unitario), 0), [itensParaRevisao]);
   const totalGeralPrevisto = useMemo(() => (comandaOriginalInfo?.total_ja_consumido || 0) + subtotalNovosItens, [comandaOriginalInfo, subtotalNovosItens]);
@@ -75,9 +93,125 @@ const RevisarPedidoPage: React.FC = () => {
   const handleRemoverItemRevisao = useCallback((produto_id: number, obs: string) => { setItensParaRevisao(prev => prev.filter(i => !(i.produto_id === produto_id && i.observacao === obs))); toast.info("Item removido.", {autoClose: 1000}); }, []);
   const handleEditarObservacaoItemRevisao = useCallback((produto_id_alvo: number, obsAntiga_alvo: string) => { const itemParaEditar = itensParaRevisao.find(i => i.produto_id === produto_id_alvo && i.observacao === obsAntiga_alvo); if (!itemParaEditar) { toast.error("Item não encontrado."); return; } const nomeProduto = itemParaEditar.nome_produto; const novaObs = prompt(`Observação para ${nomeProduto}:`, obsAntiga_alvo); if (novaObs !== null) { const obsNovaFmt = novaObs.trim(); if (obsNovaFmt === obsAntiga_alvo) { toast.info("Obs. não alterada."); return; } const itemConflitante = itensParaRevisao.find(i => i.produto_id === produto_id_alvo && i.observacao === obsNovaFmt && i !== itemParaEditar); let itensAtualizados = [...itensParaRevisao]; const itemSendoEditado = itensAtualizados.find(i => i.produto_id === produto_id_alvo && i.observacao === obsAntiga_alvo); if (itemConflitante) { const qtdDoEditado = itemSendoEditado ? itemSendoEditado.quantidade : 0; itensAtualizados = itensAtualizados.map(i => (i.produto_id === produto_id_alvo && i.observacao === obsNovaFmt) ? { ...i, quantidade: i.quantidade + qtdDoEditado } : i).filter(i => i !== itemSendoEditado ); toast.info("Itens agrupados."); } else { itensAtualizados = itensAtualizados.map(i => (i === itemSendoEditado) ? { ...i, observacao: obsNovaFmt } : i ); toast.success("Obs. atualizada."); } setItensParaRevisao(itensAtualizados); } }, [itensParaRevisao]);
   const handleVoltarParaAdicionarItens = useCallback(() => { if (!comandaOriginalInfo) { navigate('/comandas', {replace: true}); return; } navigate( `/comandas/${comandaOriginalInfo.id}/novo-pedido`, { replace: true, state: { comandaDetalhes: comandaOriginalInfo, localInformadoParaImpressao: localParaImpressao, itensPedidoRetornandoDaRevisao: itensParaRevisao, observacaoGeralRetornandoDaRevisao: observacaoGeralPedido } } ); }, [navigate, comandaOriginalInfo, localParaImpressao, itensParaRevisao, observacaoGeralPedido]);
-  const handleConfirmarEEnviar = useCallback(async () => { if (!comandaOriginalInfo || localParaImpressao === null ) { toast.error("Dados incompletos."); return; } if (comandaOriginalInfo.status?.toLowerCase() !== 'aberta') { toast.error("Comanda não está aberta."); return; } if (itensParaRevisao.length === 0 && !(observacaoGeralPedido?.trim()) && localParaImpressao === comandaOriginalInfo.local_atual) { toast.info("Nenhuma alteração."); return; } setIsSubmitting(true); const payload: BackendPedidoPayload = { comandaIdentifier: comandaOriginalInfo.numero!, local_pedido: localParaImpressao.trim(), observacao_geral: observacaoGeralPedido?.trim() || null, itens: itensParaRevisao.map(item => ({ produto_id: item.produto_id, quantidade: item.quantidade, preco_unitario_momento: item.preco_unitario, observacao_item: item.observacao?.trim() || null, })), }; try { if (statusConexao === 'online') { await criarPedidoAPI(payload); toast.success("Pedido enviado!"); navigate('/comandas', { replace: true }); } else { const pedidoOffline: PedidoOfflinePayload = { id_local: uuidv4(), timestamp: Date.now(), tentativas_sync: 0, nome_cliente_comanda: comandaOriginalInfo.cliente_nome || `Comanda ${comandaOriginalInfo.numero}`, numero_comanda_exibicao: comandaOriginalInfo.numero!, comandaIdentifier: payload.comandaIdentifier, usuario_id_frontend: user?.id || 0, local_pedido: payload.local_pedido, observacao_geral: payload.observacao_geral === null ? undefined : payload.observacao_geral, itens: payload.itens.map(it => ({ produto_id: it.produto_id, quantidade: it.quantidade, preco_unitario_momento: it.preco_unitario_momento, observacao_item: it.observacao_item, nome_produto: itensParaRevisao.find(i => i.produto_id === it.produto_id)?.nome_produto || "" })), comanda_id_db: comandaOriginalInfo.id, statusSync: 'pendente', }; await salvarPedidoParaSincronizacaoDB(pedidoOffline); toast.info("Pedido salvo offline."); navigate('/comandas', { replace: true }); } } catch (error: any) { const errorMessage = error.response?.data?.message || "Falha ao enviar."; toast.error(errorMessage); } finally { setIsSubmitting(false); } }, [comandaOriginalInfo, localParaImpressao, itensParaRevisao, observacaoGeralPedido, statusConexao, navigate, user?.id]);
 
-  if (isLoadingPage || !comandaOriginalInfo) { return <LoadingSpinner message="Carregando dados para revisão..." />; }
+  const handleConfirmarEEnviar = useCallback(async () => {
+    console.log("[RevisarPedidoPage] handleConfirmarEEnviar - INICIADO ---");
+    console.log("[RevisarPedidoPage] Status da conexão:", statusConexao);
+    console.log("[RevisarPedidoPage] Usuário (AuthContext):", JSON.stringify(user, null, 2));
+    console.log("[RevisarPedidoPage] Comanda Original Info (estado):", JSON.stringify(comandaOriginalInfo, null, 2));
+    console.log("[RevisarPedidoPage] Local para Impressão (estado):", localParaImpressao);
+    console.log("[RevisarPedidoPage] Itens para Revisão (estado):", JSON.stringify(itensParaRevisao, null, 2));
+    console.log("[RevisarPedidoPage] Observação Geral Pedido (estado):", observacaoGeralPedido);
+
+    if (!user || !user.id) {
+      toast.error("Usuário não autenticado ou ID do usuário não encontrado. Faça login novamente.");
+      console.error("[RevisarPedidoPage] ERRO: Usuário não autenticado ou ID do usuário não encontrado. User:", user);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!comandaOriginalInfo) {
+      toast.error("Informações da comanda original ausentes.");
+      console.error("[RevisarPedidoPage] ERRO: comandaOriginalInfo é null ou undefined.", comandaOriginalInfo);
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Esta é a validação crucial para o "Local para entrega"
+    if (localParaImpressao === null || localParaImpressao.trim() === '') {
+      toast.error("Dados incompletos: Local para entrega do pedido é obrigatório.");
+      console.error("[RevisarPedidoPage] ERRO: localParaImpressao é null ou string vazia. Valor:", `"${localParaImpressao}"`);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (comandaOriginalInfo.status?.toLowerCase() !== 'aberta') {
+      toast.error("Comanda não está aberta para novos pedidos.");
+      console.error("[RevisarPedidoPage] ERRO: Comanda não está aberta. Status:", comandaOriginalInfo.status);
+      setIsSubmitting(false);
+      return;
+    }
+    
+    // Verifica se há realmente algo para enviar (novos itens ou alteração de obs/local)
+    const temNovosItens = itensParaRevisao.length > 0;
+    const mudouObsGeral = observacaoGeralPedido?.trim() !== (comandaOriginalInfo.observacao_geral?.trim() || '');
+    const mudouLocal = localParaImpressao.trim() !== (comandaOriginalInfo.local_atual?.trim() || '');
+
+    if (!temNovosItens && !mudouObsGeral && !mudouLocal) {
+      toast.info("Nenhuma alteração significativa para enviar (itens, observação geral ou local).");
+      console.log("[RevisarPedidoPage] INFO: Nenhuma alteração significativa para enviar.");
+      // Não precisa resetar isSubmitting aqui, pois não foi setado para true ainda
+      return;
+    }
+
+    setIsSubmitting(true);
+    console.log("[RevisarPedidoPage] Preparando payload para envio/salvamento...");
+
+    const payloadBackend: BackendPedidoPayload = {
+      comandaIdentifier: comandaOriginalInfo.numero!,
+      local_pedido: localParaImpressao.trim(),
+      observacao_geral: observacaoGeralPedido?.trim() || null,
+      itens: itensParaRevisao.map(item => ({
+        produto_id: item.produto_id,
+        quantidade: item.quantidade,
+        preco_unitario_momento: item.preco_unitario,
+        observacao_item: item.observacao?.trim() || null,
+      })),
+    };
+    console.log("[RevisarPedidoPage] Payload para Backend (se online):", JSON.stringify(payloadBackend, null, 2));
+
+    try {
+      if (statusConexao === 'online') {
+        console.log("[RevisarPedidoPage] ONLINE: Tentando enviar pedido para API...");
+        await criarPedidoAPI(payloadBackend);
+        toast.success("Pedido enviado com sucesso!");
+        console.log("[RevisarPedidoPage] ONLINE: Pedido enviado com sucesso.");
+        navigate('/comandas', { replace: true });
+      } else {
+        console.log("[RevisarPedidoPage] OFFLINE: Preparando para salvar pedido localmente...");
+        const pedidoOffline: PedidoOfflinePayload = {
+          id_local: uuidv4(),
+          timestamp: Date.now(),
+          tentativas_sync: 0,
+          nome_cliente_comanda: comandaOriginalInfo.cliente_nome || `Comanda ${comandaOriginalInfo.numero}`,
+          numero_comanda_exibicao: comandaOriginalInfo.numero!,
+          comandaIdentifier: payloadBackend.comandaIdentifier,
+          usuario_id_frontend: user.id,
+          local_pedido: payloadBackend.local_pedido,
+          observacao_geral: payloadBackend.observacao_geral === null ? undefined : payloadBackend.observacao_geral,
+          itens: payloadBackend.itens.map(it => ({
+            produto_id: it.produto_id,
+            quantidade: it.quantidade,
+            preco_unitario_momento: it.preco_unitario_momento,
+            observacao_item: it.observacao_item,
+            nome_produto: itensParaRevisao.find(i => i.produto_id === it.produto_id)?.nome_produto || "Produto Desconhecido",
+          })),
+          comanda_id_db: comandaOriginalInfo.id,
+          statusSync: 'pendente',
+        };
+        console.log("[RevisarPedidoPage] Payload para Salvar Offline (IndexedDB):", JSON.stringify(pedidoOffline, null, 2));
+        await salvarPedidoParaSincronizacaoDB(pedidoOffline);
+        toast.info("Pedido salvo offline. Será sincronizado quando houver conexão.");
+        console.log("[RevisarPedidoPage] OFFLINE: Pedido salvo no IndexedDB.");
+        navigate('/comandas', { replace: true });
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || (error.message || "Falha ao processar o pedido.");
+      toast.error(`Erro: ${errorMessage}`);
+      console.error("[RevisarPedidoPage] ERRO ao enviar/salvar pedido:", error);
+      console.error("[RevisarPedidoPage] Detalhes do erro:", error.response?.data || error);
+    } finally {
+      console.log("[RevisarPedidoPage] handleConfirmarEEnviar - FINALIZADO ---");
+      setIsSubmitting(false);
+    }
+  }, [
+    statusConexao, user, comandaOriginalInfo, localParaImpressao,
+    itensParaRevisao, observacaoGeralPedido, navigate
+  ]);
+
+  if (isLoadingPage || !comandaOriginalInfo) {
+    return <LoadingSpinner message="Carregando dados para revisão..." />;
+  }
 
   return (
     <div className="container mx-auto p-4 sm:p-6">
@@ -85,11 +219,21 @@ const RevisarPedidoPage: React.FC = () => {
         <h1 className="text-2xl font-bold text-gray-800">Revisar Pedido - Comanda {comandaOriginalInfo.numero}</h1>
         <button onClick={handleVoltarParaAdicionarItens} className="flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 shadow-sm"> <FiArrowLeft className="mr-2 h-5 w-5" /> Voltar e Editar Itens </button>
       </div>
+
+      {/* Feedback de Conexão */}
+      {statusConexao === 'offline' && (
+        <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-md text-sm">
+          Você está offline. O pedido será salvo localmente e sincronizado quando a conexão retornar.
+        </div>
+      )}
+      
       <div className="bg-white p-6 rounded-lg shadow-xl space-y-6">
         <div className="p-4 border rounded-lg bg-gray-50">
             <h3 className="text-lg font-semibold text-gray-700 mb-2 flex items-center"><FiShoppingBag className="mr-2 text-blue-600"/> Detalhes da Comanda</h3>
             <p className="text-sm text-gray-600"><strong>Cliente:</strong> {comandaOriginalInfo.cliente_nome || 'Não informado'}</p>
-            <p className="text-sm text-gray-600"><strong>Local para Entrega:</strong> {localParaImpressao || comandaOriginalInfo.local_atual || 'Não informado'}</p>
+            <p className="text-sm text-gray-600">
+              <strong>Local para Entrega do Pedido:</strong> <span className="font-medium">{localParaImpressao || comandaOriginalInfo.local_atual || 'Não informado (Obrigatório)'}</span>
+            </p>
             {observacaoGeralPedido && <p className="text-sm text-gray-600 mt-1"><strong>Observação Geral do Pedido:</strong> <span className="italic">{observacaoGeralPedido}</span></p>}
             <p className="text-sm text-gray-600"><strong>Status da Comanda:</strong> <span className={`font-medium ${comandaOriginalInfo.status?.toLowerCase() === 'aberta' ? 'text-green-600' : 'text-red-600'}`}>{comandaOriginalInfo.status?.toUpperCase()}</span></p>
         </div>
@@ -106,7 +250,7 @@ const RevisarPedidoPage: React.FC = () => {
         </div>
         <div className="mt-8 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
           <button type="button" onClick={handleVoltarParaAdicionarItens} className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 shadow-sm" disabled={isSubmitting}> Voltar e Editar </button>
-          <button type="button" onClick={handleConfirmarEEnviar} disabled={isSubmitting || !comandaOriginalInfo || comandaOriginalInfo.status?.toLowerCase() !== 'aberta' || (itensParaRevisao.length === 0 && !(observacaoGeralPedido?.trim()))} className="w-full sm:w-auto px-6 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"> {isSubmitting ? <span className="mr-2"><LoadingSpinner message="" /></span> : <FiSave className="mr-2 h-5 w-5" />} {isSubmitting ? 'Enviando...' : 'Confirmar e Enviar Pedido'} </button>
+          <button type="button" onClick={handleConfirmarEEnviar} disabled={isSubmitting || !comandaOriginalInfo || comandaOriginalInfo.status?.toLowerCase() !== 'aberta' || (itensParaRevisao.length === 0 && !(observacaoGeralPedido?.trim()) && localParaImpressao === comandaOriginalInfo.local_atual && !localParaImpressao?.trim()) } className="w-full sm:w-auto px-6 py-3 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"> {isSubmitting ? <span className="mr-2"><LoadingSpinner message="" /></span> : <FiSave className="mr-2 h-5 w-5" />} {isSubmitting ? 'Enviando...' : 'Confirmar e Enviar Pedido'} </button>
         </div>
         {comandaOriginalInfo && comandaOriginalInfo.status?.toLowerCase() !== 'aberta' && (itensParaRevisao.length > 0 || !!(observacaoGeralPedido?.trim())) && <p className="text-xs text-red-500 text-center mt-2">A comanda original não está aberta.</p>}
       </div>
