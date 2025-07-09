@@ -23,7 +23,7 @@ export const fetchProdutos = async (params?: { categoriaId?: number, subcategori
   if (params?.subcategoriaId) queryParams.subcategoriaId = params.subcategoriaId;
   if (params?.nome) queryParams.nome = params.nome; // Para busca por nome
 
-  const response = await apiClient.get<Produto[]>('/products', { params: queryParams });
+  const response = await apiClient.get<Produto[]>('/produtos', { params: queryParams });
   return response.data;
 };
 
