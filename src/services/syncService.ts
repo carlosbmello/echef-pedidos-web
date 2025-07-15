@@ -42,7 +42,7 @@ const mapPedidoOfflineToPedidoInput = (pedidoOffline: PedidoOfflinePayload): Bac
 
   return {
     comandaIdentifier: String(pedidoOffline.comandaIdentifier), // Garante que é string
-    local_pedido: pedidoOffline.local_pedido,
+    local_cliente_entrega: pedidoOffline.local_cliente_entrega,
     observacao_geral: pedidoOffline.observacao_geral === undefined ? null : pedidoOffline.observacao_geral,
     itens: itensParaApi,
     // usuario_id não é incluído aqui, pois o backend o obtém do token JWT

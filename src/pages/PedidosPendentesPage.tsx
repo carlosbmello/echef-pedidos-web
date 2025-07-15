@@ -187,7 +187,7 @@ const PedidosPendentesPage: React.FC = () => {
               <div className="flex-grow">
                 <p className="text-xs text-gray-500 mb-1">ID: <span className="font-mono">{pedido.id_local.substring(0,8)}</span></p>
                 <p className="font-semibold text-gray-800 text-lg">Comanda {pedido.numero_comanda_exibicao}</p>
-                <p className="text-sm text-gray-600">Local: {pedido.local_pedido || 'N/A'}</p>
+                <p className="text-sm text-gray-600">Local: {pedido.local_cliente_entrega || 'N/A'}</p>
                 <p className="text-xs text-gray-500 mt-1">Criado em: {new Date(pedido.timestamp).toLocaleString('pt-BR')}</p>
                 <p className="text-sm mt-2">
                   Status:

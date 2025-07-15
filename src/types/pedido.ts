@@ -35,7 +35,7 @@ export interface ItemParaPayloadBackend {
 // Este é o tipo que PedidoPage.tsx monta e pedidoService.ts->criarPedido deve esperar.
 export interface BackendPedidoPayload {
   comandaIdentifier: string; 
-  local_pedido: string;
+  local_cliente_entrega: string;
   observacao_geral: string | null;
   itens: ItemParaPayloadBackend[];
   // usuario_id NÃO é enviado aqui, pois o backend pega do token.
@@ -58,7 +58,7 @@ export interface PedidoOfflinePayload {
   numero_comanda_exibicao: string;  
   comandaIdentifier: string; 
   usuario_id_frontend: number;
-  local_pedido: string;
+  local_cliente_entrega: string;
   observacao_geral?: string; 
   itens: ItemPedidoOffline[];
   comanda_id_db?: number | null;
