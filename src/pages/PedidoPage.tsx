@@ -39,11 +39,14 @@ const PedidoPage: React.FC = () => {
   const [subcategoriaSelecionada, setSubcategoriaSelecionada] = useState<TipoSubcategoria | null>(null);
   const [termoBusca, setTermoBusca] = useState('');
 
-  const [isLoading, setIsLoading] = useState(true);
+  // Estados de Carregamento Específicos
+  const [isLoadingCardapio, setIsLoadingCardapio] = useState(true);
+  const [isLoadingComanda, setIsLoadingComanda] = useState(true);
+
   const [statusConexao, setStatusConexao] = useState<'online' | 'offline'>(navigator.onLine ? 'online' : 'offline');
 
   const carregarCardapio = useCallback(async () => {
-    setIsLoading(true);
+    setIsLoadingCardapio(true);
     try {
       let cDB = (await getCategoriasDB()) || []; let scDB = (await getSubcategoriasDB()) || []; let pDB = (await getProdutosDB()) || [];
       const localVazio = cDB.length === 0 || pDB.length === 0;
@@ -57,7 +60,7 @@ const PedidoPage: React.FC = () => {
       } else if (!localVazio) { setCardapio({ categorias: cDB, subcategorias: scDB, produtos: pDB }); } 
       else { setCardapio(null); toast.error("Cardápio indisponível. Verifique a conexão."); }
     } catch (e: any) { console.error("Erro ao carregar cardápio:", e); toast.error("Falha crítica ao carregar cardápio."); setCardapio(null); } 
-    finally { setIsLoading(false); }
+    finally { setIsLoadingCardapio(false); }
   }, [statusConexao]);
 
   useEffect(() => {
@@ -78,6 +81,7 @@ const PedidoPage: React.FC = () => {
       setComandaStatusAtual(dados.status);
       setIdNumericoDaComanda(dados.id);
       setDadosComandaOriginal(dados);
+      setIsLoadingComanda(false);
     };
 
     if (itensVindosDaRevisao) {
@@ -86,11 +90,11 @@ const PedidoPage: React.FC = () => {
     
     if (dadosComandaDoLocation) {
       popularDados(dadosComandaDoLocation);
-      setIsLoading(false);
     } else if (idNumericoUrl) {
+      setIsLoadingComanda(true);
       buscarComandaDetalhadaPorIdAPI(idNumericoUrl)
         .then(cd => cd ? popularDados(cd) : navigate('/comandas', {replace: true}))
-        .finally(() => setIsLoading(false));
+        .finally(() => setIsLoadingComanda(false));
     } else {
       toast.error("ID da comanda inválido."); navigate('/comandas', {replace: true});
     }
@@ -127,7 +131,7 @@ const PedidoPage: React.FC = () => {
     navigate(`/comandas/${idNumericoDaComanda}/revisar-pedido`, { state: estadoParaRevisao });
   };
 
-  if (isLoading) { return <LoadingSpinner message="Carregando..." />; }
+  if (isLoadingCardapio || isLoadingComanda) { return <LoadingSpinner message={isLoadingComanda ? "Carregando comanda..." : "Carregando cardápio..."} />; }
   
   return (
     <div className="p-4 h-[calc(100vh-4rem)] bg-white flex flex-col relative">
