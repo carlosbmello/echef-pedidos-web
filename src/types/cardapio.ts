@@ -14,5 +14,28 @@ export interface Produto {
   imagem_url?: string;
   ativo: boolean; 
   permite_observacao: boolean; // <-- Assumindo que a API retorna
+  grupo_opcoes_id: number | null;
 }
 export interface Cardapio { categorias: Categoria[]; subcategorias: Subcategoria[]; produtos: Produto[];}
+
+/**
+ * Representa um item de escolha dentro de um grupo.
+ * Ex: "Morango", "Limão", "Ao Ponto".
+ */
+export interface OpcaoItem {
+  id: number;
+  nome: string;
+  valor_adicional: number;
+  grupo_id: number;
+}
+
+/**
+ * Representa um grupo de personalização.
+ * Ex: "Escolha as Frutas", "Ponto da Carne".
+ */
+export interface GrupoOpcoes {
+  id: number;
+  nome_grupo: string;
+  tipo_selecao: 'multipla' | 'unica';
+  opcoes: OpcaoItem[]; // Contém a lista de itens de opção aninhados.
+}

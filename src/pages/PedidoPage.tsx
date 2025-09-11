@@ -1,22 +1,32 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+
+// --- Imports de Serviços ---
 import {
   fetchCategorias as fetchCategoriasAPI,
   fetchSubcategorias as fetchSubcategoriasAPI,
-  fetchProdutos as fetchProdutosAPI
+  fetchProdutos as fetchProdutosAPI,
+  fetchGruposDeOpcoes as fetchGruposDeOpcoesAPI
 } from '../services/cardapioService';
 import {
   getCategoriasDB, getSubcategoriasDB, getProdutosDB,
   bulkPutCategoriasDB, bulkPutSubcategoriasDB, bulkPutProdutosDB,
-  setConfig, getConfig
+  setConfig, getConfig,
+  getGruposDeOpcoesDB, bulkPutGruposDeOpcoesDB
 } from '../services/dbService';
-import { Cardapio, Produto, Categoria as TipoCategoria, Subcategoria as TipoSubcategoria } from '../types/cardapio';
+import { buscarComandaDetalhadaPorIdAPI } from '../services/comandasService';
+
+// --- Imports de Tipos ---
+import { Cardapio, Produto, Categoria as TipoCategoria, Subcategoria as TipoSubcategoria, GrupoOpcoes, OpcaoItem } from '../types/cardapio';
 import { PedidoItemInput as ItemDoPedidoNoEstadoBase } from '../types/pedido';
 import { ComandaDetalhada } from '../types/comanda';
-import { buscarComandaDetalhadaPorIdAPI } from '../services/comandasService';
+
+// --- Imports de Componentes e UI ---
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import OpcoesProdutoModal from '../components/common/OpcoesProdutoModal';
 import { FiArrowLeft, FiPlus, FiChevronLeft, FiSearch, FiClipboard, FiXCircle } from 'react-icons/fi';
 import { toast } from 'react-toastify';
+
 
 interface ItemPedidoState extends ItemDoPedidoNoEstadoBase {
   nome_produto: string;
@@ -27,6 +37,7 @@ const PedidoPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // --- Estados do Componente ---
   const [nomeClienteComanda, setNomeClienteComanda] = useState<string | null>(null);
   const [comandaStatusAtual, setComandaStatusAtual] = useState<string | null>(null);
   const [idNumericoDaComanda, setIdNumericoDaComanda] = useState<number | null>(null);
@@ -39,28 +50,61 @@ const PedidoPage: React.FC = () => {
   const [subcategoriaSelecionada, setSubcategoriaSelecionada] = useState<TipoSubcategoria | null>(null);
   const [termoBusca, setTermoBusca] = useState('');
 
-  // Estados de Carregamento Específicos
   const [isLoadingCardapio, setIsLoadingCardapio] = useState(true);
   const [isLoadingComanda, setIsLoadingComanda] = useState(true);
-
   const [statusConexao, setStatusConexao] = useState<'online' | 'offline'>(navigator.onLine ? 'online' : 'offline');
 
+  const [gruposDeOpcoes, setGruposDeOpcoes] = useState<GrupoOpcoes[]>([]);
+  const [produtoParaOpcoes, setProdutoParaOpcoes] = useState<Produto | null>(null);
+  const [isModalOpcoesOpen, setIsModalOpcoesOpen] = useState(false);
+
+  // --- Lógica de Carregamento de Dados ---
   const carregarCardapio = useCallback(async () => {
     setIsLoadingCardapio(true);
     try {
-      let cDB = (await getCategoriasDB()) || []; let scDB = (await getSubcategoriasDB()) || []; let pDB = (await getProdutosDB()) || [];
+      let cDB = (await getCategoriasDB()) || []; 
+      let scDB = (await getSubcategoriasDB()) || []; 
+      let pDB = (await getProdutosDB()) || [];
+      let gDB = (await getGruposDeOpcoesDB()) || [];
+
       const localVazio = cDB.length === 0 || pDB.length === 0;
-      const ultimaSync = await getConfig('lastCardapioSync'); const agora = Date.now(); const DEZ_MIN_MS = 10 * 60 * 1000;
+      const ultimaSync = await getConfig('lastCardapioSync'); 
+      const agora = Date.now(); 
+      const DEZ_MIN_MS = 10 * 60 * 1000;
+      
       if (statusConexao === 'online' && (localVazio || !ultimaSync || (agora - (ultimaSync || 0) > DEZ_MIN_MS))) {
         toast.info("Sincronizando cardápio...", { autoClose: 1000, toastId: "sync-cardapio" });
-        const [apiC, apiSC, apiP] = await Promise.all([fetchCategoriasAPI(), fetchSubcategoriasAPI(), fetchProdutosAPI()]);
-        await Promise.all([bulkPutCategoriasDB(apiC), bulkPutSubcategoriasDB(apiSC), bulkPutProdutosDB(apiP)]);
+        const [apiC, apiSC, apiP, apiG] = await Promise.all([
+          fetchCategoriasAPI(), 
+          fetchSubcategoriasAPI(), 
+          fetchProdutosAPI(),
+          fetchGruposDeOpcoesAPI()
+        ]);
+        await Promise.all([
+          bulkPutCategoriasDB(apiC), 
+          bulkPutSubcategoriasDB(apiSC), 
+          bulkPutProdutosDB(apiP), 
+          bulkPutGruposDeOpcoesDB(apiG)
+        ]);
         await setConfig('lastCardapioSync', Date.now());
         setCardapio({ categorias: apiC, subcategorias: apiSC, produtos: apiP });
-      } else if (!localVazio) { setCardapio({ categorias: cDB, subcategorias: scDB, produtos: pDB }); } 
-      else { setCardapio(null); toast.error("Cardápio indisponível. Verifique a conexão."); }
-    } catch (e: any) { console.error("Erro ao carregar cardápio:", e); toast.error("Falha crítica ao carregar cardápio."); setCardapio(null); } 
-    finally { setIsLoadingCardapio(false); }
+        setGruposDeOpcoes(apiG);
+      } else if (!localVazio) { 
+        setCardapio({ categorias: cDB, subcategorias: scDB, produtos: pDB }); 
+        setGruposDeOpcoes(gDB);
+      } else { 
+        setCardapio(null); 
+        setGruposDeOpcoes([]);
+        toast.error("Cardápio indisponível. Verifique a conexão."); 
+      }
+    } catch (e: any) { 
+      console.error("Erro ao carregar cardápio:", e); 
+      toast.error("Falha crítica ao carregar cardápio."); 
+      setCardapio(null); 
+      setGruposDeOpcoes([]);
+    } finally { 
+      setIsLoadingCardapio(false); 
+    }
   }, [statusConexao]);
 
   useEffect(() => {
@@ -72,7 +116,9 @@ const PedidoPage: React.FC = () => {
     document.title = `Pedido Comanda ${dadosComandaDoLocation?.numero || comandaIdFromUrl || ''} - eChef`;
 
     if (!localVindoDaComanda) {
-      toast.error("Local de entrega não informado. Retornando."); navigate('/comandas', { replace: true }); return;
+      toast.error("Local de entrega não informado. Retornando."); 
+      navigate('/comandas', { replace: true }); 
+      return;
     }
     setLocalEntregaCliente(localVindoDaComanda);
 
@@ -96,18 +142,33 @@ const PedidoPage: React.FC = () => {
         .then(cd => cd ? popularDados(cd) : navigate('/comandas', {replace: true}))
         .finally(() => setIsLoadingComanda(false));
     } else {
-      toast.error("ID da comanda inválido."); navigate('/comandas', {replace: true});
+      toast.error("ID da comanda inválido."); 
+      navigate('/comandas', {replace: true});
     }
 
     carregarCardapio();
     return () => { document.title = 'eChef'; };
   }, [comandaIdFromUrl, location.state, navigate, carregarCardapio]);
 
-  useEffect(() => { const handleOnline = () => setStatusConexao('online'); const handleOffline = () => setStatusConexao('offline'); window.addEventListener('online', handleOnline); window.addEventListener('offline', handleOffline); return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); }; }, []);
+  useEffect(() => { 
+    const handleOnline = () => setStatusConexao('online'); 
+    const handleOffline = () => setStatusConexao('offline'); 
+    window.addEventListener('online', handleOnline); 
+    window.addEventListener('offline', handleOffline); 
+    return () => { 
+      window.removeEventListener('online', handleOnline); 
+      window.removeEventListener('offline', handleOffline); 
+    }; 
+  }, []);
 
   const subcategoriasDaCategoria = useMemo(() => { if (!cardapio || !categoriaSelecionada) return []; return cardapio.subcategorias.filter(sc => sc.categoria_id === categoriaSelecionada.id); }, [cardapio, categoriaSelecionada]);
   const categoriaTemSubcategorias = subcategoriasDaCategoria.length > 0;
   const produtosFiltrados = useMemo(() => { if (!cardapio || !categoriaSelecionada) return []; const prods = cardapio.produtos.filter(p => p.categoria_id === categoriaSelecionada.id && (!categoriaTemSubcategorias || (subcategoriaSelecionada && p.subcategoria_id === subcategoriaSelecionada.id)) && p.ativo); if (termoBusca) { const termoLower = termoBusca.toLowerCase(); return prods.filter(p => p.nome.toLowerCase().includes(termoLower) || (p.descricao && p.descricao.toLowerCase().includes(termoLower))); } return prods; }, [cardapio, categoriaSelecionada, subcategoriaSelecionada, termoBusca, categoriaTemSubcategorias]);
+
+  const grupoParaProdutoSelecionado = useMemo(() => {
+    if (!produtoParaOpcoes || !produtoParaOpcoes.grupo_opcoes_id) return null;
+    return gruposDeOpcoes.find(g => g.id === produtoParaOpcoes.grupo_opcoes_id);
+  }, [produtoParaOpcoes, gruposDeOpcoes]);
 
   const mostrarApenasCategorias = !categoriaSelecionada;
   const mostrarApenasSubcategorias = !!(categoriaSelecionada && categoriaTemSubcategorias && !subcategoriaSelecionada);
@@ -117,11 +178,64 @@ const PedidoPage: React.FC = () => {
   const handleSelectSubcategoria = (subcat: TipoSubcategoria | null) => { setSubcategoriaSelecionada(subcat); setTermoBusca(''); };
   const handleVoltarParaCategorias = () => handleSelectCategoria(null);
 
-  const adicionarItem = (produto: Produto) => { if (!produto.ativo) return; const precoNumerico = parseFloat(produto.preco_venda as any); if (isNaN(precoNumerico)) return; const adicionarItemComObs = (obs: string | null) => { const obsFinal = obs ? obs.trim() : ""; const itemExistente = itensPedido.find(i => i.produto_id === produto.id && i.observacao === obsFinal); if (itemExistente) { setItensPedido(itensPedido.map(i => i.produto_id === produto.id && i.observacao === obsFinal ? { ...i, quantidade: i.quantidade + 1 } : i)); } else { setItensPedido([...itensPedido, { produto_id: produto.id, nome_produto: produto.nome, quantidade: 1, preco_unitario: precoNumerico, observacao: obsFinal }]); } toast.success(`${produto.nome} adicionado!`, { autoClose: 1000 }); }; if (produto.permite_observacao) { const obs = prompt(`Obs. para ${produto.nome}:`, ""); if(obs === null) return; adicionarItemComObs(obs); } else { adicionarItemComObs(""); } };
+  const adicionarItem = (produto: Produto) => {
+    if (!produto.ativo) return;
+
+    if (produto.grupo_opcoes_id && gruposDeOpcoes.some(g => g.id === produto.grupo_opcoes_id)) {
+      setProdutoParaOpcoes(produto);
+      setIsModalOpcoesOpen(true);
+      return;
+    }
+    
+    const precoNumerico = parseFloat(produto.preco_venda as any);
+    if (isNaN(precoNumerico)) return;
+    
+    const adicionarItemComObs = (obs: string | null) => {
+      const obsFinal = obs ? obs.trim() : "";
+      const itemExistente = itensPedido.find(i => i.produto_id === produto.id && i.observacao === obsFinal);
+      if (itemExistente) {
+        setItensPedido(itensPedido.map(i => i.produto_id === produto.id && i.observacao === obsFinal ? { ...i, quantidade: i.quantidade + 1 } : i));
+      } else {
+        setItensPedido([...itensPedido, { produto_id: produto.id, nome_produto: produto.nome, quantidade: 1, preco_unitario: precoNumerico, observacao: obsFinal }]);
+      }
+      toast.success(`${produto.nome} adicionado!`, { autoClose: 1000 });
+    };
+
+    if (produto.permite_observacao) {
+      const obs = prompt(`Observação para ${produto.nome}:`, "");
+      if (obs === null) return;
+      adicionarItemComObs(obs);
+    } else {
+      adicionarItemComObs("");
+    }
+  };
+
+  const handleConfirmarOpcoes = (opcoesSelecionadas: OpcaoItem[], observacaoAdicional: string) => {
+    if (!produtoParaOpcoes) return;
+
+    const obsOpcoes = opcoesSelecionadas.map(s => s.nome).join(', ');
+    const obsFinal = [obsOpcoes, observacaoAdicional.trim()].filter(Boolean).join('; ');
+
+    const precoNumerico = parseFloat(produtoParaOpcoes.preco_venda as any);
+    
+    const itemExistente = itensPedido.find(i => i.produto_id === produtoParaOpcoes.id && i.observacao === obsFinal);
+    if (itemExistente) {
+      setItensPedido(prev => prev.map(i => i === itemExistente ? { ...i, quantidade: i.quantidade + 1 } : i));
+    } else {
+      setItensPedido(prev => [...prev, { produto_id: produtoParaOpcoes.id, nome_produto: produtoParaOpcoes.nome, quantidade: 1, preco_unitario: precoNumerico, observacao: obsFinal }]);
+    }
+    toast.success(`${produtoParaOpcoes.nome} adicionado!`, { autoClose: 1000 });
+  };
 
   const handleProsseguirParaRevisao = () => {
-    if (itensPedido.length === 0) { toast.info("Adicione itens ao pedido para continuar."); return; }
-    if (comandaStatusAtual?.toLowerCase() !== 'aberta') { toast.error(`A comanda não está aberta.`); return; }
+    if (itensPedido.length === 0) { 
+      toast.info("Adicione itens ao pedido para continuar."); 
+      return; 
+    }
+    if (comandaStatusAtual?.toLowerCase() !== 'aberta') { 
+      toast.error(`A comanda não está aberta.`); 
+      return; 
+    }
     
     const estadoParaRevisao = {
         comandaOriginal: dadosComandaOriginal,
@@ -131,7 +245,9 @@ const PedidoPage: React.FC = () => {
     navigate(`/comandas/${idNumericoDaComanda}/revisar-pedido`, { state: estadoParaRevisao });
   };
 
-  if (isLoadingCardapio || isLoadingComanda) { return <LoadingSpinner message={isLoadingComanda ? "Carregando comanda..." : "Carregando cardápio..."} />; }
+  if (isLoadingCardapio || isLoadingComanda) { 
+    return <LoadingSpinner message={isLoadingComanda ? "Carregando comanda..." : "Carregando cardápio..."} />; 
+  }
   
   return (
     <div className="p-4 h-[calc(100vh-4rem)] bg-white flex flex-col relative">
@@ -198,6 +314,16 @@ const PedidoPage: React.FC = () => {
             Revisar Pedido ({itensPedido.length})
           </button>
         </div>
+      )}
+
+      {grupoParaProdutoSelecionado && (
+        <OpcoesProdutoModal
+          isOpen={isModalOpcoesOpen}
+          onClose={() => setIsModalOpcoesOpen(false)}
+          onConfirm={handleConfirmarOpcoes}
+          grupo={grupoParaProdutoSelecionado}
+          nomeProduto={produtoParaOpcoes?.nome || ''}
+        />
       )}
     </div>
   );

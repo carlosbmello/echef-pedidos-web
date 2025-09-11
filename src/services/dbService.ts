@@ -1,10 +1,10 @@
-// src/services/dbService.ts
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Produto, Categoria, Subcategoria } from '../types/cardapio';
-import { PedidoOfflinePayload } from '../types/pedido'; // Importação centralizada
+import { Produto, Categoria, Subcategoria, GrupoOpcoes } from '../types/cardapio';
+import { PedidoOfflinePayload } from '../types/pedido';
 
 const DB_NAME = 'eChefPedidosDB';
-const DB_VERSION = 5;
+// A versão foi incrementada para acionar a atualização do schema
+const DB_VERSION = 6;
 
 export interface ComandaCache {
   id: number;
@@ -15,11 +15,13 @@ export interface ComandaCache {
   valor_total_calculado?: number | null;
 }
 
+// O schema agora inclui a nova "tabela" para os grupos de opções
 interface EChefDBSchema extends DBSchema {
   config: { key: string; value: any; };
   categorias: { key: number; value: Categoria; indexes: { 'nome': string }; };
   subcategorias: { key: number; value: Subcategoria; indexes: { 'categoria_id': number; 'nome': string }; };
   produtos: { key: number; value: Produto; indexes: { 'categoria_id': number; 'subcategoria_id': number; 'nome': string }; };
+  grupos_opcoes: { key: number; value: GrupoOpcoes; indexes: { 'nome_grupo': string }; };
   pedidosOffline: { key: string; value: PedidoOfflinePayload; indexes: { 'timestamp': number; 'statusSync': string }; };
   comandas_abertas_cache: { key: string; value: ComandaCache; indexes: { 'id': number }; };
 }
@@ -30,8 +32,9 @@ const initDB = () => {
   if (!dbPromise) {
     console.log("DB: Iniciando openDB para", DB_NAME, "v", DB_VERSION);
     dbPromise = openDB<EChefDBSchema>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion, newVersion, transaction) { // Renomeado _transaction para transaction
-        console.log(`DB: UPGRADE de v${oldVersion} para v${newVersion}`);
+      upgrade(db, oldVersion, newVersion, transaction) {
+        console.log(`DB: UPGRADE de v${oldVersion} para v${DB_VERSION}`);
+        
         if (oldVersion < 1) {
           console.log("DB: Aplicando schema v1 (config, categorias, subcategorias, produtos)");
           if (!db.objectStoreNames.contains('config')) { db.createObjectStore('config'); }
@@ -42,10 +45,9 @@ const initDB = () => {
         if (oldVersion < 2) {
           console.log("DB: Aplicando schema v2 (pedidosOffline)");
           if (!db.objectStoreNames.contains('pedidosOffline')) {
-            const pedidosStore = db.createObjectStore('pedidosOffline', { keyPath: 'id_local' }); // CRUCIAL: keyPath é 'localId'
+            const pedidosStore = db.createObjectStore('pedidosOffline', { keyPath: 'id_local' });
             pedidosStore.createIndex('timestamp', 'timestamp');
             pedidosStore.createIndex('statusSync', 'statusSync');
-            console.log("DB: Store 'pedidosOffline' criada com keyPath 'localId'.");
           }
         }
         if (oldVersion < 3) {
@@ -53,23 +55,23 @@ const initDB = () => {
           if (!db.objectStoreNames.contains('comandas_abertas_cache')) {
             const comandaCacheStore = db.createObjectStore('comandas_abertas_cache', { keyPath: 'numero' });
             comandaCacheStore.createIndex('id', 'id', { unique: true });
-            console.log("DB: Store 'comandas_abertas_cache' criada.");
           }
         }
-        // Verificação da keyPath em versões existentes
+        // [NOVA MIGRAÇÃO]
+        if (oldVersion < 6) {
+            console.log("DB: Aplicando schema v6 (grupos_opcoes)");
+            if (!db.objectStoreNames.contains('grupos_opcoes')) {
+                const store = db.createObjectStore('grupos_opcoes', { keyPath: 'id' });
+                store.createIndex('nome_grupo', 'nome_grupo');
+                console.log("DB: Store 'grupos_opcoes' criada.");
+            }
+        }
+
+        // Bloco de verificação, mantido por segurança
         if (transaction && db.objectStoreNames.contains('pedidosOffline')) {
             const pedidosStore = transaction.objectStore('pedidosOffline');
-            if (pedidosStore.keyPath !== 'localId') {
-                console.error("DB: ALERTA CRÍTICO! KeyPath da store 'pedidosOffline' NÃO é 'localId'. É:", pedidosStore.keyPath, ". Isso VAI causar falhas ao salvar pedidos offline.");
-                // Ação corretiva aqui seria deletar e recriar a store, mas isso apagaria dados existentes.
-                // Para desenvolvimento, você poderia fazer:
-                // db.deleteObjectStore('pedidosOffline');
-                // const newStore = db.createObjectStore('pedidosOffline', { keyPath: 'localId' });
-                // newStore.createIndex('timestamp', 'timestamp');
-                // newStore.createIndex('statusSync', 'statusSync');
-                // console.log("DB: Store 'pedidosOffline' recriada com keyPath 'localId' devido a inconsistência.");
-            } else {
-                console.log("DB: Store 'pedidosOffline' verificada, keyPath 'localId' está correta.");
+            if (pedidosStore.keyPath !== 'id_local') { // Corrigido para 'id_local'
+                console.error("DB: ALERTA CRÍTICO! KeyPath da store 'pedidosOffline' é inválida.");
             }
         }
       },
@@ -92,21 +94,36 @@ export const bulkPutSubcategoriasDB = async (subcategorias: Subcategoria[]): Pro
 export const getProdutosDB = async (): Promise<Produto[]> => { const db = await initDB(); return db.getAll('produtos'); };
 export const bulkPutProdutosDB = async (produtos: Produto[]): Promise<void> => { const db = await initDB(); const tx = db.transaction('produtos', 'readwrite'); await Promise.all(produtos.map(prod => tx.store.put(prod))); await tx.done; };
 
+// --- [NOVAS FUNÇÕES IMPLEMENTADAS] ---
+/**
+ * Busca todos os grupos de opções do IndexedDB.
+ */
+export const getGruposDeOpcoesDB = async (): Promise<GrupoOpcoes[]> => {
+    const db = await initDB();
+    return db.getAll('grupos_opcoes');
+};
+
+/**
+ * Salva uma lista de grupos de opções no IndexedDB.
+ */
+export const bulkPutGruposDeOpcoesDB = async (grupos: GrupoOpcoes[]): Promise<void> => {
+    const db = await initDB();
+    const tx = db.transaction('grupos_opcoes', 'readwrite');
+    await Promise.all(grupos.map(grupo => tx.store.put(grupo)));
+    await tx.done;
+};
+
 export const salvarPedidoParaSincronizacaoDB = async (pedido: PedidoOfflinePayload): Promise<string> => {
   try {
-    console.log("DB_SAVE: Tentando obter instância do DB...");
     const db = await initDB();
-    console.log("DB_SAVE: Instância do DB obtida. Tentando 'put' para o pedido:", JSON.parse(JSON.stringify(pedido))); // Log para ver o objeto completo
     if (!pedido.id_local) {
-        console.error("DB_SAVE: ERRO - Pedido Offline sem localId! Não será salvo.", pedido);
-        throw new Error("Pedido Offline não pode ser salvo sem um localId.");
+        throw new Error("Pedido Offline não pode ser salvo sem um id_local.");
     }
-    const resultKey = await db.put('pedidosOffline', pedido);
-    console.log(`DB_SAVE: Pedido Offline ${pedido.id_local} (key: ${resultKey}) salvo/atualizado com sucesso.`);
+    await db.put('pedidosOffline', pedido);
     return pedido.id_local;
   } catch (error) {
-    console.error("DB_SAVE: Erro DENTRO de salvarPedidoParaSincronizacaoDB:", error, "Objeto do pedido:", JSON.parse(JSON.stringify(pedido)));
-    throw error; // Re-lança o erro para ser pego pela chamada em PedidoPage
+    console.error("DB_SAVE: Erro dentro de salvarPedidoParaSincronizacaoDB:", error);
+    throw error;
   }
 };
 
