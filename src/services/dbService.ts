@@ -32,7 +32,7 @@ const initDB = () => {
   if (!dbPromise) {
     console.log("DB: Iniciando openDB para", DB_NAME, "v", DB_VERSION);
     dbPromise = openDB<EChefDBSchema>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion, newVersion, transaction) {
+      upgrade(db, oldVersion, _newVersion, transaction) {
         console.log(`DB: UPGRADE de v${oldVersion} para v${DB_VERSION}`);
         
         if (oldVersion < 1) {
