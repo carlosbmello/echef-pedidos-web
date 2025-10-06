@@ -1,20 +1,37 @@
 // echef-pedidos-web/vite.config.ts
+
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// --- ADICIONADO: Imports para HTTPS ---
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// --- ADICIONADO: Definição moderna de __dirname ---
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 
 export default defineConfig({
 
   server: {
     host: true, 
+    port: 5173, // A porta que você definiu
+
+    // --- ADICIONADO: Configuração HTTPS ---
+    https: {
+      key: fs.readFileSync(path.resolve(__dirname, '../certs/localhost+3-key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, '../certs/localhost+3.pem')),
+    }
   },
 
   plugins: [
     react(),
     VitePWA({
       strategies: 'injectManifest',
-      srcDir: 'src', // Diretório onde o arquivo fonte do SW está (continua 'src')
-      filename: 'sw.ts', // ATUALIZADO: Nome do arquivo fonte do SW (agora na raiz de srcDir)
+      srcDir: 'src',
+      filename: 'sw.ts',
 
       registerType: 'autoUpdate',
       devOptions: {
@@ -24,8 +41,6 @@ export default defineConfig({
 
       injectManifest: {
         globPatterns: ['**/*.{html,ico,png,svg,json,woff2,ttf,eot}'],
-        // Não defina swDest aqui, deixe o plugin usar o padrão
-        // que é colocar na raiz de outDir com base no filename.
       },
 
       manifest: {
