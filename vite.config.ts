@@ -4,22 +4,31 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// --- ADICIONADO: Imports para HTTPS ---
+// Imports para HTTPS
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// --- ADICIONADO: Definição moderna de __dirname ---
+// Definição moderna de __dirname
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 
 export default defineConfig({
 
+  // Configuração para 'npm run dev'
   server: {
     host: true, 
     port: 5173, // A porta que você definiu
+    https: {
+      key: fs.readFileSync(path.resolve(__dirname, '../certs/localhost+3-key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, '../certs/localhost+3.pem')),
+    }
+  },
 
-    // --- ADICIONADO: Configuração HTTPS ---
+  // --- ADICIONADO: Configuração para 'npm run preview' (usado pelo PM2) ---
+  preview: {
+    host: true,
+    port: 5173, // Usar a mesma porta para consistência
     https: {
       key: fs.readFileSync(path.resolve(__dirname, '../certs/localhost+3-key.pem')),
       cert: fs.readFileSync(path.resolve(__dirname, '../certs/localhost+3.pem')),
@@ -61,7 +70,7 @@ export default defineConfig({
             purpose: 'any maskable',
           },
           {
-            src: 'icons/icon-512x512.png',
+            src: 'icons/icon-512x192.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable',
