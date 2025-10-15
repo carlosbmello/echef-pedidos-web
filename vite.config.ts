@@ -20,8 +20,8 @@ export default defineConfig({
     host: true, 
     port: 5173, // A porta que você definiu
     https: {
-      key: fs.readFileSync(path.resolve(__dirname, '../certs/localhost+3-key.pem')),
-      cert: fs.readFileSync(path.resolve(__dirname, '../certs/localhost+3.pem')),
+      key: fs.readFileSync(path.resolve(__dirname, '../certs/local-key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, '../certs/local-cert.pem')),
     }
   },
 
@@ -30,8 +30,8 @@ export default defineConfig({
     host: true,
     port: 5173, // Usar a mesma porta para consistência
     https: {
-      key: fs.readFileSync(path.resolve(__dirname, '../certs/localhost+3-key.pem')),
-      cert: fs.readFileSync(path.resolve(__dirname, '../certs/localhost+3.pem')),
+      key: fs.readFileSync(path.resolve(__dirname, '../certs/local-key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, '../certs/local-cert.pem')),
     }
   },
 
