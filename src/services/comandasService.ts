@@ -1,34 +1,34 @@
 // src/services/comandasService.ts
 import apiClient from '../config/api';
 import { 
-    Comanda,                // Para o tipo de retorno da API de lista (ex: GET /comandas)
+    Comanda,                
     ComandaCache, 
     ComandaDetalhada, 
-    ComandaSearchResult     // Que agora é Comanda | null
+    ComandaSearchResult     
 } from '../types/comanda';
 import { bulkReplaceComandasCacheDB, setConfig } from './dbService';
 
-const API_URL_BASE = `${import.meta.env.VITE_API_BASE_URL}`; // URL base da API
-const API_COMANDAS_ENDPOINT = `${API_URL_BASE}/comandas`; // Endpoint específico de comandas
+// [CORREÇÃO] Não lemos mais o .env aqui. Usamos caminho relativo.
+// O apiClient já sabe que deve ir para '.../api/admin'
+const COMANDAS_PATH = '/comandas'; 
 
-// Tipos para Payload e Resposta da Criação de Nova Comanda
+// Tipos para Payload e Resposta
 interface NovaComandaPayload {
   numero: string;
   cliente_nome?: string | null;
-  // local_atual foi removido, pois você indicou que não é informado na criação
 }
 
 interface NovaComandaResponse {
   message: string;
   comandaId: number;
-  // comanda?: Comanda; // Opcional: se a API retornar o objeto criado
 }
 
 // --- FUNÇÃO PARA CRIAR NOVA COMANDA ---
 export const criarNovaComandaAPI = async (payload: NovaComandaPayload): Promise<NovaComandaResponse> => {
   console.log("[comandasService] Enviando para criar nova comanda:", payload);
   try {
-    const response = await apiClient.post<NovaComandaResponse>(`${API_COMANDAS_ENDPOINT}/`, payload); // POST para /api/comandas/
+    // Agora vai para: .../api/admin/comandas/
+    const response = await apiClient.post<NovaComandaResponse>(`${COMANDAS_PATH}/`, payload); 
     return response.data;
   } catch (error: any) {
     console.error("Erro no serviço ao criar nova comanda:", error);
@@ -36,13 +36,11 @@ export const criarNovaComandaAPI = async (payload: NovaComandaPayload): Promise<
   }
 };
 
-// --- Função para buscar UMA comanda específica por NÚMERO (usada na ComandasPage ao buscar) ---
-// Esta função deve retornar ComandaDetalhada se você quiser exibir os itens já na ComandasPage.
+// --- Função para buscar UMA comanda detalhada por NÚMERO ---
 export const buscarComandaDetalhadaPorNumeroAPI = async (numeroComanda: string): Promise<ComandaDetalhada | null> => {
     console.log(`[comandasService] Buscando detalhes completos para comanda Nº ${numeroComanda}...`);
     try {
-        // Chama a rota específica do backend para busca por número
-        const response = await apiClient.get<ComandaDetalhada>(`${API_COMANDAS_ENDPOINT}/numero/${numeroComanda}`);
+        const response = await apiClient.get<ComandaDetalhada>(`${COMANDAS_PATH}/numero/${numeroComanda}`);
         return response.data;
     } catch (error: any) {
         if (error.response && error.response.status === 404) {
@@ -53,12 +51,11 @@ export const buscarComandaDetalhadaPorNumeroAPI = async (numeroComanda: string):
     }
 };
 
-// --- Função para buscar UMA comanda por ID com todos os detalhes e itens (usada na PedidoPage) ---
+// --- Função para buscar UMA comanda detalhada por ID ---
 export const buscarComandaDetalhadaPorIdAPI = async (comandaId: number): Promise<ComandaDetalhada | null> => {
     console.log(`[comandasService] Buscando detalhes completos para comanda ID ${comandaId}...`);
     try {
-        // Chama a rota específica do backend para busca por ID
-        const response = await apiClient.get<ComandaDetalhada>(`${API_COMANDAS_ENDPOINT}/id/${comandaId}`);
+        const response = await apiClient.get<ComandaDetalhada>(`${COMANDAS_PATH}/id/${comandaId}`);
         return response.data;
     } catch (error: any) {
         if (error.response && error.response.status === 404) {
@@ -71,13 +68,10 @@ export const buscarComandaDetalhadaPorIdAPI = async (comandaId: number): Promise
 
 
 // --- Função para SINCRONIZAR Comandas Abertas ---
- // Usada para popular o cache local com dados básicos das comandas abertas.
 export const sincronizarComandasAbertasAPI = async (): Promise<number> => {
   console.log("COMANDAS_SVC: Sincronizando comandas abertas da API...");
   try {
-    // A API GET /api/comandas?status=aberta retorna um array de objetos Comanda.
-    // O tipo Comanda (definido em comanda.ts) deve refletir a estrutura desses objetos.
-    const response = await apiClient.get<Comanda[]>(`${API_COMANDAS_ENDPOINT}`, { // GET para /api/comandas
+    const response = await apiClient.get<Comanda[]>(`${COMANDAS_PATH}`, { 
       params: {
        status: 'aberta',
       }
@@ -90,15 +84,11 @@ export const sincronizarComandasAbertasAPI = async (): Promise<number> => {
         id: c.id,
         numero: c.numero,
         cliente_nome: c.cliente_nome,
-        // O tipo Comanda pode ter local_atual ou localizacao_cliente.
-        // O tipo ComandaCache espera local_atual.
         local_atual: c.local_atual || c.localizacao_cliente, 
         data_abertura: c.data_abertura,
-        status: c.status, // Mapeia o status para o cache
-        // O tipo Comanda pode ter valor_total_calculado (string/number) ou total_atual_calculado (number).
-        // O tipo ComandaCache espera valor_total_calculado (number | null).
+        status: c.status, 
         valor_total_calculado: 
-            c.total_atual_calculado !== undefined ? c.total_atual_calculado : // Prioriza se existir
+            c.total_atual_calculado !== undefined ? c.total_atual_calculado : 
             (typeof c.valor_total_calculado === 'string' ? parseFloat(c.valor_total_calculado) :
             (typeof c.valor_total_calculado === 'number' ? c.valor_total_calculado : null)),
       }));
@@ -117,15 +107,10 @@ export const sincronizarComandasAbertasAPI = async (): Promise<number> => {
   }
 };
 
-
-// Se você ainda usa fetchComandaByNumero em algum lugar para uma busca mais simples
-// e ela retorna um tipo diferente de ComandaDetalhada, mantenha-a, mas
-// certifique-se que o tipo ComandaSearchResult e Comanda estão corretos.
-// Se ela não for mais usada, pode ser removida.
-// Por segurança, vou mantê-la aqui, mas a busca principal na ComandasPage agora usa buscarComandaDetalhadaPorNumeroAPI.
+// --- Função legada (se ainda usada) ---
 export const fetchComandaByNumero = async (numeroComanda: string): Promise<ComandaSearchResult> => {
   try {
-    const response = await apiClient.get<Comanda[]>(`${API_COMANDAS_ENDPOINT}`, {
+    const response = await apiClient.get<Comanda[]>(`${COMANDAS_PATH}`, {
       params: { numero: numeroComanda, status: 'aberta' }
     });
     if (response.data && response.data.length > 0) {
