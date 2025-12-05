@@ -1,9 +1,8 @@
+// src/components/common/OpcoesProdutoModal.tsx
 import React, { useState, useEffect } from 'react';
-// Certifique-se de que o caminho para seus tipos está correto
 import { GrupoOpcoes, OpcaoItem } from '../../types/cardapio'; 
 import { FiX } from 'react-icons/fi';
 
-// Define as propriedades que o nosso modal vai receber
 interface OpcoesProdutoModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -65,23 +64,30 @@ const OpcoesProdutoModal: React.FC<OpcoesProdutoModalProps> = ({
 
         <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
           <div className="space-y-2">
-            {grupo.opcoes.map(opcao => (
-              <label key={opcao.id} className="flex items-center p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
-                <input
-                  type={grupo.tipo_selecao === 'unica' ? 'radio' : 'checkbox'}
-                  name={`opcao-grupo-${grupo.id}`}
-                  className="h-5 w-5 rounded-full text-blue-600 border-gray-300 focus:ring-blue-500"
-                  checked={opcoesSelecionadas.some(s => s.id === opcao.id)}
-                  onChange={() => handleToggleSelecao(opcao)}
-                />
-                <span className="ml-3 flex-grow text-gray-800">{opcao.nome}</span>
-                {opcao.valor_adicional > 0 && (
-                    <span className="text-sm font-semibold text-green-600">
-                        + R$ {String(opcao.valor_adicional.toFixed(2)).replace('.', ',')}
-                    </span>
-                )}
-              </label>
-            ))}
+            {grupo.opcoes.map(opcao => {
+              // [CORREÇÃO]: Garantimos que o valor é um número antes de verificar e formatar
+              const valorNumerico = Number(opcao.valor_adicional || 0);
+
+              return (
+                <label key={opcao.id} className="flex items-center p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    type={grupo.tipo_selecao === 'unica' ? 'radio' : 'checkbox'}
+                    name={`opcao-grupo-${grupo.id}`}
+                    className="h-5 w-5 rounded-full text-blue-600 border-gray-300 focus:ring-blue-500"
+                    checked={opcoesSelecionadas.some(s => s.id === opcao.id)}
+                    onChange={() => handleToggleSelecao(opcao)}
+                  />
+                  <span className="ml-3 flex-grow text-gray-800">{opcao.nome}</span>
+                  
+                  {/* Exibe o valor apenas se for maior que zero, formatado corretamente */}
+                  {valorNumerico > 0 && (
+                      <span className="text-sm font-semibold text-green-600">
+                          + R$ {valorNumerico.toFixed(2).replace('.', ',')}
+                      </span>
+                  )}
+                </label>
+              );
+            })}
           </div>
 
           <textarea
