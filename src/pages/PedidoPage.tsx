@@ -216,13 +216,28 @@ const PedidoPage: React.FC = () => {
     const obsOpcoes = opcoesSelecionadas.map(s => s.nome).join(', ');
     const obsFinal = [obsOpcoes, observacaoAdicional.trim()].filter(Boolean).join('; ');
 
-    const precoNumerico = parseFloat(produtoParaOpcoes.preco_venda as any);
+    // [CORREÇÃO]: Calcular o total dos adicionais
+    const totalAdicionais = opcoesSelecionadas.reduce((acc, op) => acc + Number(op.valor_adicional || 0), 0);
+    
+    // [CORREÇÃO]: Preço Unitário Final = Preço Base + Adicionais
+    const precoBase = parseFloat(produtoParaOpcoes.preco_venda as any);
+    const precoFinal = precoBase + totalAdicionais;
     
     const itemExistente = itensPedido.find(i => i.produto_id === produtoParaOpcoes.id && i.observacao === obsFinal);
+    
     if (itemExistente) {
+      // Se já existe igual (mesmas opções), soma a quantidade
+      // Nota: O preço unitário deve ser o mesmo, então não precisa atualizar
       setItensPedido(prev => prev.map(i => i === itemExistente ? { ...i, quantidade: i.quantidade + 1 } : i));
     } else {
-      setItensPedido(prev => [...prev, { produto_id: produtoParaOpcoes.id, nome_produto: produtoParaOpcoes.nome, quantidade: 1, preco_unitario: precoNumerico, observacao: obsFinal }]);
+      // Se é novo, adiciona com o PREÇO FINAL CALCULADO
+      setItensPedido(prev => [...prev, { 
+          produto_id: produtoParaOpcoes.id, 
+          nome_produto: produtoParaOpcoes.nome, 
+          quantidade: 1, 
+          preco_unitario: precoFinal, // <--- AQUI ESTAVA O ERRO, AGORA VAI O PREÇO CHEIO
+          observacao: obsFinal 
+      }]);
     }
     toast.success(`${produtoParaOpcoes.nome} adicionado!`, { autoClose: 1000 });
   };
