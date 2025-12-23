@@ -287,13 +287,23 @@ const PedidoPage: React.FC = () => {
       {statusConexao === 'offline' && <div className="flex-shrink-0 mb-2 p-2 bg-yellow-100 text-yellow-700 text-xs rounded text-center">Cardápio pode estar desatualizado (cache).</div>}
       
       <div className="mb-4 flex-shrink-0">
-        {(mostrarApenasCategorias || mostrarApenasSubcategorias) && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-           {(mostrarApenasCategorias ? cardapio?.categorias ?? [] : subcategoriasDaCategoria).map((item) => (
-              <button key={item.id} onClick={() => mostrarApenasCategorias ? handleSelectCategoria(item as TipoCategoria) : handleSelectSubcategoria(item as TipoSubcategoria)} className="px-4 py-2 text-sm font-semibold text-gray-800 bg-white border-2 border-gray-200 rounded-lg shadow-sm hover:border-blue-500 hover:bg-blue-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 transition-all duration-150">{item.nome}</button>
-            ))}
-          </div>
-        )}
+  {(mostrarApenasCategorias || mostrarApenasSubcategorias) && (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {/* AQUI ESTÁ A MUDANÇA: Adicionamos .slice().sort(...) antes do .map */}
+      {(mostrarApenasCategorias ? cardapio?.categorias ?? [] : subcategoriasDaCategoria)
+        .slice() // Cria uma cópia da lista para não alterar o estado original
+        .sort((a, b) => a.nome.localeCompare(b.nome)) // Ordena ALFABETICAMENTE (A-Z)
+        .map((item) => (
+          <button 
+            key={item.id} 
+            onClick={() => mostrarApenasCategorias ? handleSelectCategoria(item as TipoCategoria) : handleSelectSubcategoria(item as TipoSubcategoria)} 
+            className="px-4 py-2 text-sm font-semibold text-gray-800 bg-white border-2 border-gray-200 rounded-lg shadow-sm hover:border-blue-500 hover:bg-blue-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 transition-all duration-150"
+          >
+            {item.nome}
+          </button>
+      ))}
+    </div>
+  )}
         {mostrarApenasProdutos && (
           <div className="relative mb-2">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><FiSearch className="h-4 w-4 text-gray-400" /></div>
