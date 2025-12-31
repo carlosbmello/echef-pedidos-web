@@ -43,13 +43,13 @@ const ComandasPage: React.FC = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [comandaEncontrada]); // Adicionado comandaEncontrada para focar no input certo
+  }, [comandaEncontrada]); 
 
   const limparResultadosBusca = () => {
     setComandaEncontrada(null);
     setError(null);
     setIsOfflineResult(false);
-    setNumeroBusca(''); // Limpa o campo de busca para uma nova pesquisa
+    setNumeroBusca(''); 
   };
 
   const buscarNoCache = async (numeroComanda: string) => {
@@ -127,20 +127,32 @@ const ComandasPage: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                 <div className="sm:col-span-1">
                     <label htmlFor="numeroComanda" className="block text-sm font-medium text-gray-700 mb-1"> Número Comanda <span className="text-red-500">*</span></label>
-                    <input ref={inputRef} type="text" id="numeroComanda" value={numeroBusca} onChange={(e)=> setNumeroBusca(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Número..." required />
+                    {/* [ATUALIZAÇÃO] Input Numérico para Busca */}
+                    <input 
+                      ref={inputRef} 
+                      type="number"           
+                      inputMode="numeric"     
+                      pattern="[0-9]*"        
+                      id="numeroComanda" 
+                      value={numeroBusca} 
+                      onChange={(e)=> setNumeroBusca(e.target.value)} 
+                      className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-lg" 
+                      placeholder="Número..." 
+                      required 
+                    />
                 </div>
                 <div className="sm:col-span-1">
                     <label htmlFor="localEntrega" className="block text-sm font-medium text-gray-700 mb-1"><FiEdit3 className="inline mr-1 text-gray-500 h-4 w-4 align-text-bottom" /> Local (p/ Pedido) <span className="text-red-500">*</span></label>
-                    <input ref={localInputRef} type="text" id="localEntrega" value={localEntregaCliente} onChange={(e) => setLocalEntregaCliente(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="Ex: Mesa 7, Balcão" required />
+                    <input ref={localInputRef} type="text" id="localEntrega" value={localEntregaCliente} onChange={(e) => setLocalEntregaCliente(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-lg" placeholder="Ex: Mesa 7, Balcão" required />
                 </div>
                 <div className="sm:col-span-1">
-                    <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-5 rounded-md shadow-sm flex items-center justify-center disabled:opacity-50"> <FiSearch className="mr-2" /> {isLoading ? 'Buscando...' : 'Buscar'} </button>
+                    <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-5 rounded-md shadow-sm flex items-center justify-center disabled:opacity-50"> <FiSearch className="mr-2" /> {isLoading ? 'Buscando...' : 'Buscar'} </button>
                 </div>
             </div>
           </form>
         </>
       ) : (
-        // TELA 2: RESULTADO DA BUSCA
+        // TELA 2: RESULTADO DA BUSCA (Permanece a mesma)
         <div>
           <div className="flex justify-between items-center mb-6">
             <button onClick={limparResultadosBusca} className="flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 shadow-sm">

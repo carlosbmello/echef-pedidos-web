@@ -3,13 +3,12 @@ import React, { useState, useRef, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { criarNovaComandaAPI } from '../services/comandasService';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { FiPlusCircle, FiUser, FiHash, FiCheckCircle, FiArrowLeft } from 'react-icons/fi'; // Removido FiMapPin
+import { FiPlusCircle, FiUser, FiHash, FiCheckCircle, FiArrowLeft } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 
 const CriarComandaPage: React.FC = () => {
   const [numeroNovaComanda, setNumeroNovaComanda] = useState('');
   const [clienteNovaComanda, setClienteNovaComanda] = useState('');
-  // Estado para localNovaComanda foi removido
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +36,6 @@ const CriarComandaPage: React.FC = () => {
       const payload = {
         numero: numeroNovaComanda.trim(),
         cliente_nome: clienteNovaComanda.trim() || null,
-        // local_atual não é mais enviado
       };
       console.log("[CriarComandaPage] Enviando payload para criar comanda:", payload);
       const response = await criarNovaComandaAPI(payload);
@@ -47,22 +45,7 @@ const CriarComandaPage: React.FC = () => {
 
       setNumeroNovaComanda('');
       setClienteNovaComanda('');
-      // setLocalNovaComanda(''); // Não é mais necessário
       numeroInputRef.current?.focus();
-
-      // Opcional: Navegar para a página de pedido da nova comanda
-      // if (confirm(`Comanda ${payload.numero} criada. Deseja adicionar itens agora?`)) {
-      //   navigate(`/comandas/${response.comandaId}/novo-pedido`, { 
-      //     state: { 
-      //       numeroComandaExibicao: payload.numero,
-      //       nomeCliente: payload.cliente_nome,
-      //       // localAtualComanda: null, // ou um valor padrão se PedidoPage esperar
-      //       idComandaDB: response.comandaId,
-      //       statusComanda: 'aberta',
-      //       totalJaConsumidoState: 0
-      //     } 
-      //   });
-      // }
 
     } catch (err: any) {
       console.error("[CriarComandaPage] Erro ao criar comanda:", err);
@@ -108,14 +91,18 @@ const CriarComandaPage: React.FC = () => {
             <label htmlFor="numeroNovaComanda" className="block text-sm font-semibold text-gray-700 mb-1">
               <FiHash className="inline mr-2 align-text-bottom text-gray-500"/>Número da Comanda <span className="text-red-500">*</span>
             </label>
+            {/* [ATUALIZAÇÃO] Input Numérico Otimizado para Mobile */}
             <input
               ref={numeroInputRef}
-              type="text"
               id="numeroNovaComanda"
+              type="number"           
+              inputMode="numeric"     
+              pattern="[0-9]*"        
               value={numeroNovaComanda}
               onChange={(e) => { setNumeroNovaComanda(e.target.value); setError(null); setComandaCriadaInfo(null); }}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-lg font-bold"
               required
+              placeholder="Ex: 2020"
             />
           </div>
 
@@ -131,8 +118,6 @@ const CriarComandaPage: React.FC = () => {
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
             />
           </div>
-
-          {/* O campo de input para Localização Inicial foi removido daqui */}
           
           {error && (
             <p className="text-red-600 text-sm text-center bg-red-50 p-3 rounded-md border border-red-200">{error}</p>
