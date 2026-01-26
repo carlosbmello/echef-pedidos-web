@@ -145,6 +145,38 @@ const RevisarPedidoPage: React.FC = () => {
     }
   }, [statusConexao, user, comandaOriginalInfo, localEntregaCliente, itensParaRevisao, observacaoGeralInput, navigate]);
 
+// --- BLOQUEIO DO BOTÃO VOLTAR DO CELULAR (REVISÃO) ---
+  useEffect(() => {
+    if (itensParaRevisao.length === 0) return;
+
+    const detectarBotaoVoltarRevisao = () => {
+      const confirmar = window.confirm("Deseja cancelar o envio deste pedido?");
+      if (!confirmar) {
+        window.history.pushState(null, "", window.location.pathname);
+      } else {
+        // Se ele quiser sair, mandamos ele de volta para o cardápio desta comanda
+        navigate(`/comandas/${comandaIdFromUrl}/novo-pedido`, {
+           state: location.state // Mantém o estado para não perder os itens se ele mudar de ideia lá
+        });
+      }
+    };
+
+    window.history.pushState(null, "", window.location.pathname);
+    window.addEventListener('popstate', detectarBotaoVoltarRevisao);
+
+    const detectarF5Revisao = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', detectarF5Revisao);
+
+    return () => {
+      window.removeEventListener('popstate', detectarBotaoVoltarRevisao);
+      window.removeEventListener('beforeunload', detectarF5Revisao);
+    };
+  }, [itensParaRevisao.length, navigate, comandaIdFromUrl, location.state]);
+
+
   if (isLoadingPage || !comandaOriginalInfo) {
     return <LoadingSpinner message="Carregando dados para revisão..." />;
   }

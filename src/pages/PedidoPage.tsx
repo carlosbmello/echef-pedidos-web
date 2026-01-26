@@ -260,6 +260,46 @@ const PedidoPage: React.FC = () => {
     navigate(`/comandas/${idNumericoDaComanda}/revisar-pedido`, { state: estadoParaRevisao });
   };
 
+// --- BLOQUEIO DO BOTÃO VOLTAR DO CELULAR ---
+  useEffect(() => {
+    // Só ativa o bloqueio se houver itens no pedido
+    if (itensPedido.length === 0) return;
+
+    // Função que lida com o botão "Voltar" do celular
+    const detectarBotaoVoltar = () => {
+      const confirmarSaida = window.confirm(
+        "Atenção! Você tem itens anotados. Se sair agora, o pedido será APAGADO. Deseja realmente sair?"
+      );
+
+      if (!confirmarSaida) {
+        // Se o garçom cancelar, empurramos ele de volta para "dentro" da página
+        window.history.pushState(null, "", window.location.pathname);
+      } else {
+        // Se ele confirmar, deixamos ele sair para as comandas
+        navigate('/comandas');
+      }
+    };
+
+    // Empurra uma entrada "falsa" no histórico para o botão voltar ter o que "morder"
+    window.history.pushState(null, "", window.location.pathname);
+    
+    // Escuta o evento de voltar do sistema (Android/iOS)
+    window.addEventListener('popstate', detectarBotaoVoltar);
+
+    // Proteção extra: Fechar aba ou F5
+    const detectarF5ouFechar = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = ''; 
+    };
+    window.addEventListener('beforeunload', detectarF5ouFechar);
+
+    // Limpeza ao sair da página
+    return () => {
+      window.removeEventListener('popstate', detectarBotaoVoltar);
+      window.removeEventListener('beforeunload', detectarF5ouFechar);
+    };
+  }, [itensPedido.length, navigate]);
+
   if (isLoadingCardapio || isLoadingComanda) { 
     return <LoadingSpinner message={isLoadingComanda ? "Carregando comanda..." : "Carregando cardápio..."} />; 
   }
