@@ -1,22 +1,33 @@
-// src/config/api.ts (VERSÃO DINÂMICA)
+// src/config/api.ts (VERSÃO HÍBRIDA NUVEM/LOCAL)
 import axios from 'axios';
 
-// --- LÓGICA DE URL DINÂMICA ---
-// 1. Detecta onde o app está rodando (localhost ou IP)
-const protocol = window.location.protocol; 
-const hostname = window.location.hostname;
-const port = '3010'; // Porta fixa do Backend
+const getBaseURL = () => {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
 
-// 2. Monta a base
-const dynamicBaseURL = `${protocol}//${hostname}:${port}/api`;
+    // 1. VERIFICA SE ESTÁ NO AMBIENTE LOCAL (Mini PC ou Rede Local)
+    const isLocal = 
+        hostname === 'localhost' || 
+        hostname === '127.0.0.1' || 
+        hostname.startsWith('192.168.') || 
+        hostname.endsWith('.local');
 
-// 3. Adiciona o prefixo de Admin (Pedidos é admin)
-const adminBaseUrl = `${dynamicBaseURL}/admin`;
+    if (isLocal) {
+        // No local, batemos direto na porta 3010 para suportar modo offline
+        return `${protocol}//${hostname}:3010/api/admin`;
+    }
 
-console.log(`[API Pedidos] Conectando dinamicamente em: ${adminBaseUrl}`);
+    // 2. AMBIENTE DE NUVEM (PRODUÇÃO)
+    // Na nuvem, usamos o subdomínio da API central sem a porta 3010
+    return `https://api.neverlandbar.com.br/api/admin`;
+};
+
+const API_BASE_URL = getBaseURL();
+
+console.log(`[API Pedidos] Conectando em: ${API_BASE_URL}`);
 
 const apiClient = axios.create({
-  baseURL: adminBaseUrl,
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json'
   },
